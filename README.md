@@ -1,6 +1,6 @@
 # Learning LLMs from First Principles
 
-This repository contains code and experiments for understanding Large Language Models (LLMs) from the ground up.
+This repository contains code and experiments for understanding LLMs from first principles. Huge thanks to Sebastian Raschka for the original book and codebase.
 
 ## Setup Instructions
 
@@ -8,7 +8,7 @@ To set up your development environment, follow these steps:
 
 ### 1. Python Environment
 
-We recommend using a Conda environment with Python 3.10.
+I recommend using a Conda environment with Python 3.10.
 
 ```bash
 # Create the environment
@@ -18,24 +18,21 @@ conda create -n llm-first-principles python=3.10
 conda activate llm-first-principles
 ```
 
-### 2. Install Dependencies
+### 2. Install Project in Editable Mode
 
-Install the required libraries using `pip`:
+Install the required libraries and the project itself in "editable" mode. This allows you to import from project subdirectories (like `data/` or `models/`) from anywhere.
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
-### 3. Verify Setup
+> **Note:** Because this is an editable install, any changes you make to the code are immediately available without needing to re-install!
 
-You can verify that your environment is correctly set up by running the environment check script:
+### 3. Verify & Run
+
+You can verify your environment and run the core tests:
 
 ```bash
+# Verify environment check
 python setup/python_environment_check.py
 ```
-
-For more setup details, feel free to explore the [setup/](./setup/) directory.
-
----
-
-*Based on setup instructions from [llm-from-scratch-nikmag](https://github.com/rasbt/LLMs-from-scratch)*
