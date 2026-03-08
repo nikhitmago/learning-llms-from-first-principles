@@ -48,7 +48,9 @@ hatch run test
 
 ## Project Structure
 
-- **`src/`**: Contains the core logic and datasets.
+- **`src/`**: Contains the core logic and model architecture.
+    - **`data/`**: Datasets and loaders.
+    - **`models/`**: Neural network components (Attention layers, Transformers, etc.).
 - **`tests/`**: Contains unit and end-to-end tests, mirrored to the source structure.
 - **`setup/`**: Documentation and environment verification scripts.
 
