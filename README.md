@@ -30,9 +30,23 @@ pip install -e .
 
 ### 3. Verify & Run
 
-You can verify your environment and run the core tests:
+You can verify your environment and run the core quality checks:
 
 ```bash
-# Verify environment check
-python setup/python_environment_check.py
+# Auto-format and sort imports
+hatch run format
+
+# Run full health check (linting + tests)
+hatch run all
+
+# Run only tests
+hatch run test
 ```
+
+## Project Structure
+
+- **`src/`**: Contains the core logic and datasets.
+- **`tests/`**: Contains unit and end-to-end tests, mirrored to the source structure.
+- **`setup/`**: Documentation and environment verification scripts.
+
+---

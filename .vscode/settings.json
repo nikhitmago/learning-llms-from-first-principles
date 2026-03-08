@@ -2,6 +2,9 @@
     "files.exclude": {
         "**/.DS_Store": true,
         "**/__pycache__": true,
-        "**/*.egg-info": true
+        "**/*.egg-info": true,
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true,
+        "**/.ruff_cache": true
     }
 }

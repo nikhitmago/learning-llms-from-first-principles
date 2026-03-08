@@ -24,4 +24,3 @@ class GPTDatasetV1(Dataset):
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         return self.input_ids[idx], self.target_ids[idx]
-this is a syntax error

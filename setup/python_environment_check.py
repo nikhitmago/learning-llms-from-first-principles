@@ -3,16 +3,16 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-from importlib.metadata import PackageNotFoundError, import_module
 import importlib.metadata
-from os.path import dirname, exists, join, realpath
-from packaging.version import parse as version_parse
 import platform
 import sys
+from importlib.metadata import PackageNotFoundError, import_module
+from os.path import dirname, exists, join, realpath
+
+from packaging.version import parse as version_parse
 
 if version_parse(platform.python_version()) < version_parse("3.9"):
-    print("[FAIL] We recommend Python 3.9 or newer but"
-          " found version %s" % (sys.version))
+    print("[FAIL] We recommend Python 3.9 or newer but" " found version %s" % (sys.version))
 else:
     print("[OK] Your Python version is %s" % (platform.python_version()))
 
@@ -23,9 +23,11 @@ def get_packages(pkgs):
         try:
             imported = import_module(p)
             try:
-                version = (getattr(imported, "__version__", None) or
-                           getattr(imported, "version", None) or
-                           getattr(imported, "version_info", None))
+                version = (
+                    getattr(imported, "__version__", None)
+                    or getattr(imported, "version", None)
+                    or getattr(imported, "version_info", None)
+                )
                 if version is None:
                     # If common attributes don"t exist, use importlib.metadata
                     version = importlib.metadata.version(p)
