@@ -44,29 +44,58 @@ def get_packages(pkgs):
 def get_requirements_dict():
     PROJECT_ROOT = dirname(realpath(__file__))
     PROJECT_ROOT_UP_ONE = dirname(PROJECT_ROOT)
-    REQUIREMENTS_FILE = join(PROJECT_ROOT_UP_ONE, "requirements.txt")
-    if not exists(REQUIREMENTS_FILE):
-        REQUIREMENTS_FILE = join(PROJECT_ROOT, "requirements.txt")
+    TOML_FILE = join(PROJECT_ROOT_UP_ONE, "pyproject.toml")
+    
+    if not exists(TOML_FILE):
+        return {}
 
     d = {}
-    with open(REQUIREMENTS_FILE) as f:
-        for line in f:
-            if not line.strip():
-                continue
-            if "," in line:
-                left, right = line.split(",")
-                lower = right.split("#")[0].strip()
-                package, _, upper = left.split(" ")
-                package = package.strip()
-                _, lower = lower.split(" ")
-                lower = lower.strip()
-                upper = upper.strip()
-                d[package] = (upper, lower)
-            else:
-                line = line.split("#")[0].strip()
-                line = line.split(" ")
-                line = [ln.strip() for ln in line]
-                d[line[0]] = line[-1]
+    try:
+        if sys.version_info >= (3, 11):
+            import tomllib
+        else:
+            import tomli as tomllib
+            
+        with open(TOML_FILE, "rb") as f:
+            toml_data = tomllib.load(f)
+            dependencies = toml_data.get("project", {}).get("dependencies", [])
+            for dep in dependencies:
+                # Basic parsing for "name>=version" or "name>=version,<version"
+                # This is simplified but covers current project needs
+                import re
+                match = re.match(r"([a-zA-Z0-9_\-]+)\s*(>=|==|<|>|<=)\s*([0-9\.]+)(?:,\s*(<|>|<=|>=|==)\s*([0-9\.]+))?", dep)
+                if match:
+                    name = match.group(1)
+                    lower = match.group(3)
+                    upper = match.group(5)
+                    if upper:
+                        d[name] = (lower, upper)
+                    else:
+                        d[name] = lower
+    except Exception:
+        # Fallback to manual parsing if toml parser is not available or fails
+        with open(TOML_FILE, "r") as f:
+            in_dependencies = False
+            for line in f:
+                if "dependencies =" in line:
+                    in_dependencies = True
+                    continue
+                if in_dependencies:
+                    if "]" in line:
+                        break
+                    line = line.strip().strip(",").strip('"').strip("'")
+                    if not line:
+                        continue
+                    # Simple split on >= or ==
+                    import re
+                    match = re.split(r">=|==|<", line)
+                    if len(match) >= 2:
+                        name = match[0].strip()
+                        version = match[1].strip()
+                        # Check for upper bound
+                        if "," in version:
+                            version = version.split(",")[0].strip()
+                        d[name] = version
     return d
 
 

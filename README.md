@@ -33,6 +33,9 @@ pip install -e .
 You can verify your environment and run the core quality checks:
 
 ```bash
+# Verify all required packages are correctly installed
+python setup/python_environment_check.py
+
 # Auto-format and sort imports
 hatch run format
 
