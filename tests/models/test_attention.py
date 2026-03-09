@@ -1,6 +1,7 @@
 import torch
 
 from models.attention import (
+    MultiHeadAttentionCombinedQKV,
     MultiHeadAttentionWeightSplits,
     MultiHeadAttentionWrapper,
     SelfAttention,
@@ -53,6 +54,25 @@ def test_multihead_attention_weight_splits() -> None:
     dropout = 0.0
 
     mha = MultiHeadAttentionWeightSplits(d_emb, d_attn, context_len, dropout, num_heads)
+
+    # Test 3D input (batch_size, seq_len, d_emb)
+    batch_size = 2
+    seq_len = 6
+    x = torch.randn(batch_size, seq_len, d_emb)
+
+    output = mha(x)
+
+    # Output should have shape (batch_size, seq_len, d_attn)
+    assert output.shape == (batch_size, seq_len, d_attn)
+    assert not torch.isnan(output).any()
+
+
+def test_multihead_attention_combined_qkv() -> None:
+    torch.manual_seed(123)
+    d_emb, d_attn, context_len, num_heads = 12, 4, 8, 2
+    dropout = 0.0
+
+    mha = MultiHeadAttentionCombinedQKV(d_emb, d_attn, context_len, dropout, num_heads)
 
     # Test 3D input (batch_size, seq_len, d_emb)
     batch_size = 2

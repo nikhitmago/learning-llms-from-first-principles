@@ -131,3 +131,66 @@ class MultiHeadAttentionWeightSplits(nn.Module):
         # project
         context_vec = self.out_proj(context_vec)
         return context_vec
+
+
+class MultiHeadAttentionCombinedQKV(nn.Module):
+    mask: torch.Tensor
+
+    def __init__(
+        self, d_emb: int, d_attn: int, context_len: int, dropout: float, num_heads: int
+    ) -> None:
+        super().__init__()
+        assert d_attn % num_heads == 0, "embed_dim is indivisible by num_heads"
+
+        self.d_emb = d_emb
+        self.d_attn = d_attn
+        self.context_len = context_len
+        self.num_heads = num_heads
+        self.head_dim = d_attn // num_heads
+
+        self.qkv = nn.Linear(d_emb, 3 * d_attn, bias=False)
+        self.dropout_layer = nn.Dropout(dropout)
+        self.out_proj = nn.Linear(d_attn, d_attn)
+
+        self.register_buffer(
+            "mask", torch.triu(torch.ones(context_len, context_len), diagonal=1).bool()
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        bs, seq_len, d_emb = x.shape
+
+        # qkv weights: bs, seq_len, 3 * d_attn
+        #   qkv split: bs, seq_len, 3, d_attn
+        #   qkv split: bs, seq_len, 3, num_heads, head_dim
+        #   qkv split: 3, bs, seq_len, num_heads, head_dim
+        #   qkv split: 3, bs, num_heads, seq_len, head_dim
+        qkv = self.qkv(x)
+        qkv = qkv.view(bs, seq_len, 3, self.num_heads, self.head_dim)
+        qkv = qkv.permute(2, 0, 3, 1, 4)
+
+        # split qkv: bs, num_heads, seq_len, head_dim
+        queries, keys, values = qkv.unbind(0)
+
+        # attn_scores: bs, num_heads, seq_len, seq_len
+        attn_scores = queries @ keys.transpose(2, 3)
+
+        # apply attn_mask
+        attn_scores.masked_fill_(self.mask[:seq_len, :seq_len], -torch.inf)
+
+        # apply softmax
+        attn_weights = torch.softmax(attn_scores / keys.shape[-1] ** 0.5, dim=-1)
+
+        # apply dropout
+        attn_weights = self.dropout_layer(attn_weights)
+
+        # get the context vector: bs, num_heads, seq_len, head_dim
+        context_vec = attn_weights @ values
+
+        # transpose the context vector to combine: bs, seq_len, num_heads, head_dim
+        context_vec.transpose_(1, 2)
+
+        # combine the last 2 dims of the context vec
+        context_vec = context_vec.contiguous().view(bs, seq_len, self.d_attn)
+
+        context_vec = self.out_proj(context_vec)
+        return context_vec
