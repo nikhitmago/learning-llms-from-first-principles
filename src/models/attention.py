@@ -45,3 +45,19 @@ class SelfAttention(nn.Module):
             attn_weights @ values
         )  # Matrix-multiplies the (6, 6) mask against each element in the (10, 6, 2) batch by broadcasting across the batch dimension.
         return context_vec
+
+
+class MultiHeadAttentionWrapper(nn.Module):
+    "Naive implementation of MHA by stacking SA modules"
+
+    def __init__(
+        self, d_emb: int, d_attn: int, context_len: int, dropout: float, num_heads: int
+    ) -> None:
+        super().__init__()
+
+        self.heads = nn.ModuleList(
+            [SelfAttention(d_emb, d_attn, context_len, dropout) for i in range(num_heads)]
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.cat([head(x) for head in self.heads], dim=-1)
