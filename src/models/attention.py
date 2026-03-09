@@ -61,3 +61,73 @@ class MultiHeadAttentionWrapper(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return torch.cat([head(x) for head in self.heads], dim=-1)
+
+
+class MultiHeadAttentionWeightSplits(nn.Module):
+    "MHA with weight splits for QKV"
+
+    mask: torch.Tensor
+
+    def __init__(self, d_emb: int, d_attn: int, context_len: int, dropout: float, num_heads: int):
+        super().__init__()
+
+        assert d_attn % num_heads == 0, "d_out must be divisible by num_heads"
+
+        # QKV matrices and attn proj matrices
+        self.W_q = nn.Linear(d_emb, d_attn, bias=False)
+        self.W_k = nn.Linear(d_emb, d_attn, bias=False)
+        self.W_v = nn.Linear(d_emb, d_attn, bias=False)
+        self.out_proj = nn.Linear(d_attn, d_attn)
+
+        self.head_dim = d_attn // num_heads
+        self.num_heads = num_heads
+        self.d_attn = d_attn
+        self.dropout_layer = nn.Dropout(dropout)
+        self.register_buffer(
+            "mask", torch.triu(torch.ones(context_len, context_len), diagonal=1).bool()
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        bs, seq_len, d_emb = x.shape  # seq_len <= context_len
+
+        # qkv: bs, seq_len, d_attn
+        queries = self.W_q(x)
+        keys = self.W_k(x)
+        values = self.W_v(x)
+
+        # split d_attn into num_heads, head_dim
+        queries = queries.view(bs, seq_len, self.num_heads, self.head_dim)
+        keys = keys.view(bs, seq_len, self.num_heads, self.head_dim)
+        values = values.view(bs, seq_len, self.num_heads, self.head_dim)
+
+        # transpose qk to (bs, num_heads, seq_len, head_dim) for attn_scores
+        queries.transpose_(1, 2)
+        keys.transpose_(1, 2)
+        values.transpose_(1, 2)
+
+        # attn_scores: bs, num_heads, seq_len, seq_len
+        attn_scores = queries @ keys.transpose(2, 3)
+
+        # apply attn mask for causal attention: shape remains the same
+        attn_scores.masked_fill_(self.mask[:seq_len, :seq_len], -torch.inf)
+
+        # apply softmax to get attention weights: shape remains the same
+        attn_weights = torch.softmax(attn_scores / keys.shape[-1] ** 0.5, dim=-1)
+
+        # apply dropout: shape remains the same
+        attn_weights = self.dropout_layer(attn_weights)
+
+        # get the context vector: bs, num_heads, seq_len, head_dim
+        # attn_weigths: bs, num_heads, seq_len, seq_len
+        #       values: bs, num_heads, seq_len, head_dim
+        context_vec = attn_weights @ values
+
+        # transpose the context_vec: bs, seq_len, num_heads, head_dim
+        context_vec.transpose_(1, 2)
+
+        # combine the heads before linear layer
+        context_vec = context_vec.contiguous().view(bs, seq_len, self.d_attn)
+
+        # project
+        context_vec = self.out_proj(context_vec)
+        return context_vec
