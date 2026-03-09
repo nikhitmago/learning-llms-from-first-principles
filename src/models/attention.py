@@ -32,7 +32,9 @@ class SelfAttention(nn.Module):
         )  # .T won't work becasu ootb cuz there is batch dim
 
         # allow masking sequences shorter than max context_len by slicing the mask: bs, cur_context_len, cur_context_len
-        attn_scores.masked_fill_(self.mask[:cur_context_len, :cur_context_len], -torch.inf)
+        attn_scores = attn_scores.masked_fill(
+            self.mask[:cur_context_len, :cur_context_len], -torch.inf
+        )
 
         # attention weights: apply softmax after normalizing with key's d_attn dim
         attn_weights = torch.softmax(attn_scores / (keys.shape[-1] ** 0.5), dim=-1)
@@ -101,15 +103,15 @@ class MultiHeadAttentionWeightSplits(nn.Module):
         values = values.view(bs, seq_len, self.num_heads, self.head_dim)
 
         # transpose qk to (bs, num_heads, seq_len, head_dim) for attn_scores
-        queries.transpose_(1, 2)
-        keys.transpose_(1, 2)
-        values.transpose_(1, 2)
+        queries = queries.transpose(1, 2)
+        keys = keys.transpose(1, 2)
+        values = values.transpose(1, 2)
 
         # attn_scores: bs, num_heads, seq_len, seq_len
         attn_scores = queries @ keys.transpose(2, 3)
 
         # apply attn mask for causal attention: shape remains the same
-        attn_scores.masked_fill_(self.mask[:seq_len, :seq_len], -torch.inf)
+        attn_scores = attn_scores.masked_fill(self.mask[:seq_len, :seq_len], -torch.inf)
 
         # apply softmax to get attention weights: shape remains the same
         attn_weights = torch.softmax(attn_scores / keys.shape[-1] ** 0.5, dim=-1)
@@ -123,7 +125,7 @@ class MultiHeadAttentionWeightSplits(nn.Module):
         context_vec = attn_weights @ values
 
         # transpose the context_vec: bs, seq_len, num_heads, head_dim
-        context_vec.transpose_(1, 2)
+        context_vec = context_vec.transpose(1, 2)
 
         # combine the heads before linear layer
         context_vec = context_vec.contiguous().view(bs, seq_len, self.d_attn)
@@ -175,7 +177,7 @@ class MultiHeadAttentionCombinedQKV(nn.Module):
         attn_scores = queries @ keys.transpose(2, 3)
 
         # apply attn_mask
-        attn_scores.masked_fill_(self.mask[:seq_len, :seq_len], -torch.inf)
+        attn_scores = attn_scores.masked_fill(self.mask[:seq_len, :seq_len], -torch.inf)
 
         # apply softmax
         attn_weights = torch.softmax(attn_scores / keys.shape[-1] ** 0.5, dim=-1)
@@ -187,7 +189,7 @@ class MultiHeadAttentionCombinedQKV(nn.Module):
         context_vec = attn_weights @ values
 
         # transpose the context vector to combine: bs, seq_len, num_heads, head_dim
-        context_vec.transpose_(1, 2)
+        context_vec = context_vec.transpose(1, 2)
 
         # combine the last 2 dims of the context vec
         context_vec = context_vec.contiguous().view(bs, seq_len, self.d_attn)
