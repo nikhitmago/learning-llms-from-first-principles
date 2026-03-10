@@ -1,6 +1,6 @@
 import torch
 
-from data.dataloader import create_dataloader_v1
+from learning_llms_from_first_principles.data.dataloader import create_dataloader_v1
 
 
 def test_create_dataloader_v1() -> None:

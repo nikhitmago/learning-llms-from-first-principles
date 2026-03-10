@@ -1,7 +1,7 @@
 import tiktoken
 import torch
 
-from data.datasets import GPTDatasetV1
+from learning_llms_from_first_principles.data.datasets import GPTDatasetV1
 
 
 def test_gpt_dataset_v1_initialization() -> None:

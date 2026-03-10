@@ -1,6 +1,6 @@
 import torch
 
-from models.attention import (
+from learning_llms_from_first_principles.models.attention import (
     MultiHeadAttentionCombinedQKV,
     MultiHeadAttentionWeightSplits,
     MultiHeadAttentionWrapper,

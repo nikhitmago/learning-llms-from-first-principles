@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "llm-first-principles"
+name = "learning_llms_from_first_principles"
 version = "0.1.0"
 description = "Learning LLMs from First Principles"
 readme = "README.md"

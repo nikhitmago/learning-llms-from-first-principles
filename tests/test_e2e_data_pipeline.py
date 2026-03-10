@@ -3,13 +3,15 @@ import os
 import tiktoken
 import torch
 
-from data.dataloader import create_dataloader_v1
+from learning_llms_from_first_principles.data.dataloader import create_dataloader_v1
 
 
 def test_e2e_data_pipeline() -> None:
     # Path to data
     base_dir = os.path.dirname(os.path.dirname(__file__))
-    data_path = os.path.join(base_dir, "src", "data", "the-verdict.txt")
+    data_path = os.path.join(
+        base_dir, "src", "learning_llms_from_first_principles", "data", "the-verdict.txt"
+    )
 
     assert os.path.exists(data_path), f"Data file not found at {data_path}"
 
