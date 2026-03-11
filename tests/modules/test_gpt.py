@@ -1,7 +1,7 @@
 import torch
 
 from learning_llms_from_first_principles.config import GPT_CONFIG_124M
-from learning_llms_from_first_principles.models.gpt import GPTModel
+from learning_llms_from_first_principles.modules.gpt import GPTModel
 
 
 def test_gpt_model_output_shape() -> None:

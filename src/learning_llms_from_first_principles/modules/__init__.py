@@ -1,12 +1,12 @@
-from learning_llms_from_first_principles.models.attention import (
+from learning_llms_from_first_principles.modules.attention import (
     MultiHeadAttentionCombinedQKV,
     MultiHeadAttentionWeightSplits,
     MultiHeadAttentionWrapper,
     SelfAttention,
 )
-from learning_llms_from_first_principles.models.gpt import GPTModel
-from learning_llms_from_first_principles.models.norm import LayerNorm
-from learning_llms_from_first_principles.models.transformer import TransformerBlock
+from learning_llms_from_first_principles.modules.gpt import GPTModel
+from learning_llms_from_first_principles.modules.norm import LayerNorm
+from learning_llms_from_first_principles.modules.transformer import TransformerBlock
 
 __all__ = [
     "SelfAttention",

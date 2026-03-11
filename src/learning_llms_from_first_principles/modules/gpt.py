@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-from learning_llms_from_first_principles.models.norm import LayerNorm
-from learning_llms_from_first_principles.models.transformer import TransformerBlock
+from learning_llms_from_first_principles.modules.norm import LayerNorm
+from learning_llms_from_first_principles.modules.transformer import TransformerBlock
 
 
 class GPTModel(nn.Module):

@@ -1,6 +1,6 @@
 import torch
 
-from learning_llms_from_first_principles.models.norm import LayerNorm
+from learning_llms_from_first_principles.modules.norm import LayerNorm
 
 
 def test_layer_norm_output_shape() -> None:

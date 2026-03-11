@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-from learning_llms_from_first_principles.models.attention import MultiHeadAttentionWeightSplits
-from learning_llms_from_first_principles.models.feedforward import Feedforward
-from learning_llms_from_first_principles.models.norm import LayerNorm
+from learning_llms_from_first_principles.modules.attention import MultiHeadAttentionWeightSplits
+from learning_llms_from_first_principles.modules.feedforward import Feedforward
+from learning_llms_from_first_principles.modules.norm import LayerNorm
 
 
 class TransformerBlock(nn.Module):

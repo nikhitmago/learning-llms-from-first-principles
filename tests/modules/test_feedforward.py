@@ -1,6 +1,6 @@
 import torch
 
-from learning_llms_from_first_principles.models.feedforward import GELU, Feedforward
+from learning_llms_from_first_principles.modules.feedforward import GELU, Feedforward
 
 
 def test_gelu_output_shape() -> None:

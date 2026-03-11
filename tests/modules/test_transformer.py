@@ -1,7 +1,7 @@
 import torch
 
 from learning_llms_from_first_principles.config import GPT_CONFIG_124M
-from learning_llms_from_first_principles.models.transformer import TransformerBlock
+from learning_llms_from_first_principles.modules.transformer import TransformerBlock
 
 
 def test_transformer_block_output_shape() -> None:
