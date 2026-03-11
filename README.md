@@ -20,7 +20,7 @@ conda activate llm-first-principles
 
 ### 2. Install Project in Editable Mode
 
-Install the required libraries and the project itself in "editable" mode. This allows you to import from project subdirectories (like `data/` or `models/`) from anywhere.
+Install the required libraries and the project itself in "editable" mode. This allows you to import from project subdirectories (like `data/` or `modules/`) from anywhere.
 
 ```bash
 pip install -e .
@@ -50,7 +50,7 @@ hatch run test
 
 - **`src/`**: Contains the core logic and model architecture.
     - **`data/`**: Datasets and loaders.
-    - **`models/`**: Neural network components (Attention layers, Transformers, etc.).
+    - **`modules/`**: Neural network components (Attention layers, Transformers, etc.).
 - **`tests/`**: Contains unit and end-to-end tests, mirrored to the source structure.
 - **`setup/`**: Documentation and environment verification scripts.
 
