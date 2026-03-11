@@ -15,7 +15,7 @@ def test_generate_text_simple() -> None:
         "qkv_bias": False,
     }
     model = GPTModel(cfg)
-    model.eval()
+    model.eval()  # disable dropout
 
     # Batch of 2, starting with 4 tokens each
     idx = torch.randint(0, 100, (2, 4))
