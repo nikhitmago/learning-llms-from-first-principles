@@ -1,5 +1,6 @@
 import torch
 
+from learning_llms_from_first_principles.config import GPT_CONFIG_124M
 from learning_llms_from_first_principles.models.gpt import GPTModel
 
 
@@ -21,3 +22,9 @@ def test_gpt_model_output_shape() -> None:
 
     # Expected shape: (batch_size, seq_len, vocab_size)
     assert logits.shape == (2, 4, 100)
+
+
+def test_gpt_124m_model_parameter_count() -> None:
+    model = GPTModel(GPT_CONFIG_124M)
+    total_params = sum(p.numel() for p in model.parameters())
+    assert total_params == 163009536
