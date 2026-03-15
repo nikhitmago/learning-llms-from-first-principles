@@ -13,7 +13,8 @@ class GELU(nn.Module):
             * (
                 1
                 + torch.tanh(
-                    torch.sqrt(torch.tensor(2.0 / torch.pi)) * (x + 0.044715 * torch.pow(x, 3))
+                    torch.sqrt(torch.tensor(2.0 / torch.pi, device=x.device))
+                    * (x + 0.044715 * torch.pow(x, 3))
                 )
             )
         )

@@ -27,7 +27,7 @@ class GPTModel(nn.Module):
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
         bs, seq_len = token_ids.shape
         token_embeds = self.tok_emb(token_ids)
-        pos_embeds = self.pos_emb(torch.arange(seq_len))
+        pos_embeds = self.pos_emb(torch.arange(seq_len, device=token_ids.device))
 
         x = token_embeds + pos_embeds
         x = self.drop_emb(x)
