@@ -1,3 +1,5 @@
+from typing import Any
+
 import tiktoken
 from torch.utils.data import DataLoader
 
@@ -12,9 +14,11 @@ def create_dataloader_v1(
     shuffle: bool = True,
     drop_last: bool = True,
     num_workers: int = 0,
+    tokenizer: Any = None,
 ) -> DataLoader:
-    # Initialize the tokenizer
-    tokenizer = tiktoken.get_encoding("gpt2")
+    # Initialize the tokenizer if not provided
+    if tokenizer is None:
+        tokenizer = tiktoken.get_encoding("gpt2")
 
     # Create dataset
     dataset = GPTDatasetV1(txt, tokenizer, max_length, stride)
