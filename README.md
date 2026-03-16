@@ -2,11 +2,16 @@
 
 This repository contains code and experiments for understanding LLMs from first principles. Huge thanks to Sebastian Raschka for the original book and codebase.
 
-## Setup Instructions
+## Getting Started
 
-To set up your development environment, follow these steps:
+### 1. Clone the Repository
 
-### 1. Python Environment
+```bash
+git clone https://github.com/nikhitmago/learning-llms-from-first-principles.git
+cd learning-llms-from-first-principles
+```
+
+### 2. Python Environment
 
 I recommend using a Conda environment with Python 3.10.
 
@@ -18,24 +23,19 @@ conda create -n llm-first-principles python=3.10
 conda activate llm-first-principles
 ```
 
-### 2. Install Project in Editable Mode
+### 3. Install Project
 
-Install the required libraries and the project itself in "editable" mode. This allows you to import from project subdirectories (like `data/` or `modules/`) from anywhere.
+Install the project in **editable mode** to enable the command-line tools and allows imports from anywhere in the codebase.
 
 ```bash
 pip install -e .
 ```
 
-> **Note:** Because this is an editable install, any changes you make to the code are immediately available without needing to re-install!
+### 4. Development & Quality Check
 
-### 3. Verify & Run
-
-You can verify your environment and run the core quality checks:
+You can verify your environment and run core health checks using `hatch`:
 
 ```bash
-# Verify all required packages are correctly installed
-python setup/python_environment_check.py
-
 # Auto-format and sort imports
 hatch run format
 
@@ -46,12 +46,37 @@ hatch run all
 hatch run test
 ```
 
+---
+
+## Pre-Training
+
+The project provides a production-ready entry point for training. You can run pre-training directly from your terminal using the `pretrain` command.
+
+### Usage
+
+The trainer uses **Hydra** for configuration management. All parameters in [**`src/.../config/train.yaml`**](file:///Users/nikmag/Documents/learning-llms-from-first-principles/src/learning_llms_from_first_principles/config/train.yaml) can be overridden from the CLI.
+
+```bash
+# Run with default settings
+pretrain
+
+# Use a specific training config file
+pretrain --config-name train
+
+# Override model or training parameters
+pretrain model.name=gpt2-large training.lr=0.001 training.num_epochs=10
+```
+
+---
+
 ## Project Structure
 
-- **`src/`**: Contains the core logic and model architecture.
-    - **`data/`**: Datasets and loaders.
-    - **`modules/`**: Neural network components (Attention layers, Transformers, etc.).
-- **`tests/`**: Contains unit and end-to-end tests, mirrored to the source structure.
-- **`setup/`**: Documentation and environment verification scripts.
+- **`src/`**: Core logic and model architecture.
+    - **`config/`**: Centralized YAML configurations (Hydra).
+    - **`trainer/`**: Main training engine and CLI entry points.
+    - **`utils/`**: General helper functions (loss, device setup, etc.).
+    - **`modules/`**: Neural network components (Attention, Transformers, etc.).
+- **`tests/`**: Unit and end-to-end tests.
+- **`notebooks/`**: Exploratory scratchpads and tutorials.
 
 ---

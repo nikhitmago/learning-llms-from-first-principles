@@ -1,0 +1,17 @@
+training:
+  num_epochs: 5
+  eval_freq: 5
+  eval_iter: 1
+  lr: 0.0004
+  weight_decay: 0.1
+  batch_size: 2
+  max_length: 64
+  stride: 32
+
+data:
+  file_path: "/Users/nikmag/Documents/learning-llms-from-first-principles/src/learning_llms_from_first_principles/data/the-verdict.txt"
+  train_ratio: 0.9
+  val_ratio: 0.1
+
+model:
+  name: "gpt2-124m"
