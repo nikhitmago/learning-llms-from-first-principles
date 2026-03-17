@@ -112,6 +112,7 @@ def test_train_model_warmup() -> None:
 
     # Total steps = 2 epochs * 10 batches/epoch = 20 steps
     # Warmup steps = 20 * 0.5 = 10 steps
+    decay_floor_lr = 1e-4
     model, train_losses, val_losses, lrs = train_model_v1(
         model,
         loader,
@@ -123,6 +124,7 @@ def test_train_model_warmup() -> None:
         tokenizer=DummyTokenizer(),
         warmup_ratio=0.5,
         warmup_min_lr=warmup_min_lr,
+        decay_floor_lr=decay_floor_lr,
     )
 
     # Check first step (global_step 0)
@@ -133,11 +135,19 @@ def test_train_model_warmup() -> None:
     # step 5 = 0.001 + 5 * 0.0009 = 0.0055
     assert lrs[5] == pytest.approx(0.0055)
 
-    # Check end of warmup (step 10)
+    # Check end of warmup / start of decay (step 10)
+    # progress = (10-10)/(20-10) = 0 -> cos(0)=1 -> lr = peak_lr
     assert lrs[10] == pytest.approx(peak_lr)
 
-    # Check post-warmup (step 15)
-    assert lrs[15] == pytest.approx(peak_lr)
+    # Check midpoint of decay (step 15)
+    # progress = (15-10)/(20-10) = 0.5 -> cos(pi/2)=0 -> lr = decay_floor + (peak-decay)*0.5
+    expected_mid_decay = decay_floor_lr + (peak_lr - decay_floor_lr) * 0.5
+    assert lrs[15] == pytest.approx(expected_mid_decay)
+
+    # Check near end of decay (step 19)
+    # Should be decreasing towards decay_floor_lr
+    assert lrs[19] < lrs[18]
+    assert lrs[19] > decay_floor_lr
 
     # Verify total number of recorded LRs
     assert len(lrs) == 20

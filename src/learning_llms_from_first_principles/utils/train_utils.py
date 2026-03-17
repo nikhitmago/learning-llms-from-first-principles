@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, TypeVar
 
 import torch
@@ -84,6 +85,9 @@ def train_model_v1(
 
     print(f"LR Schedule: Warmup for {warmup_steps} steps ({warmup_ratio*100:.1f}%)")
     print(f" Warm up LR Range: {warmup_min_lr} -> {peak_lr}")
+    print(
+        f" Cosine Annealing: {peak_lr} -> {decay_floor_lr} over {total_training_steps - warmup_steps} steps"
+    )
     print(f"Total Training Steps: {total_training_steps}")
 
     for epoch in range(num_epochs):
@@ -100,7 +104,11 @@ def train_model_v1(
             if global_step < warmup_steps:
                 lr = warmup_min_lr + global_step * warmup_lr_increment
             else:
-                lr = peak_lr
+                # Cosine annealing
+                progress = (global_step - warmup_steps) / (total_training_steps - warmup_steps)
+                lr = decay_floor_lr + (peak_lr - decay_floor_lr) * 0.5 * (
+                    1 + math.cos(math.pi * progress)
+                )
 
             for param_group in optimizer.param_groups:
                 param_group["lr"] = lr
