@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 import torch.nn as nn
 
@@ -89,3 +91,37 @@ def generate_text_simple(
         idx = torch.cat((idx, idx_next), dim=1)
 
     return idx
+
+
+def classify_text(
+    text: str,
+    model: nn.Module,
+    tokenizer: Any,
+    device: torch.device | str = "cpu",
+    label_map: dict[int, str] | None = None,
+) -> str:
+    """Classify a single text string using a fine-tuned GPT classifier.
+
+    Args:
+        text: The input text to classify.
+        model: A GPT model with a classification ``out_head``.
+        tokenizer: A tiktoken-compatible tokenizer.
+        device: Device to run inference on.
+        label_map: Optional mapping from class index to label string.
+            Defaults to ``{0: "ham", 1: "spam"}``.
+
+    Returns:
+        The predicted label string.
+    """
+    if label_map is None:
+        label_map = {0: "ham", 1: "spam"}
+
+    model.eval()
+    token_ids = tokenizer.encode(text)
+    token_tensor = torch.tensor(token_ids, dtype=torch.long).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        logits = model(token_tensor)[:, -1, :]
+
+    pred = int(torch.argmax(logits, dim=-1).item())
+    return label_map[pred]

@@ -82,3 +82,52 @@ def test_generate_text_simple_with_top_p() -> None:
         model, idx, max_new_tokens=2, context_size=5, temperature=1.0, top_p=0.5, top_k=10
     )
     assert out.shape == (1, 5)
+
+
+def test_classify_text() -> None:
+    import tiktoken
+
+    from learning_llms_from_first_principles.inference.generate import classify_text
+
+    cfg = {
+        "vocab_size": 50257,
+        "context_len": 128,
+        "emb_dim": 32,
+        "n_heads": 2,
+        "n_layers": 2,
+        "drop_rate": 0.0,
+        "qkv_bias": False,
+    }
+    model = GPTModel(cfg)
+    model.out_head = torch.nn.Linear(32, 2)
+    model.eval()
+
+    tokenizer = tiktoken.get_encoding("gpt2")
+    result = classify_text("Hello world", model, tokenizer)
+
+    assert result in ("ham", "spam")
+
+
+def test_classify_text_custom_labels() -> None:
+    import tiktoken
+
+    from learning_llms_from_first_principles.inference.generate import classify_text
+
+    cfg = {
+        "vocab_size": 50257,
+        "context_len": 128,
+        "emb_dim": 32,
+        "n_heads": 2,
+        "n_layers": 2,
+        "drop_rate": 0.0,
+        "qkv_bias": False,
+    }
+    model = GPTModel(cfg)
+    model.out_head = torch.nn.Linear(32, 3)
+    model.eval()
+
+    tokenizer = tiktoken.get_encoding("gpt2")
+    labels = {0: "positive", 1: "negative", 2: "neutral"}
+    result = classify_text("Great product", model, tokenizer, label_map=labels)
+
+    assert result in ("positive", "negative", "neutral")
