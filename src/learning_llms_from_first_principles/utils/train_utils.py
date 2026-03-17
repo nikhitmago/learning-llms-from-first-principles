@@ -173,6 +173,7 @@ def train_model_v1(
                     idx=input_ids,
                     max_new_tokens=20,
                     context_size=int(GPT_CONFIG_124M["context_len"]),
+                    temperature=0.0,
                 )
 
                 # Process each sample in the batch until we hit our limit of 2

@@ -21,7 +21,24 @@ def test_generate_text_simple() -> None:
     idx = torch.randint(0, 100, (2, 4))
 
     # Generate 5 new tokens
-    out = generate_text_simple(model, idx, max_new_tokens=5, context_size=10)
+    out = generate_text_simple(model, idx, max_new_tokens=5, context_size=10, temperature=0.0)
 
     # Expected shape: (batch_size, original_tokens + max_new_tokens)
     assert out.shape == (2, 9)
+
+
+def test_generate_text_simple_with_temp() -> None:
+    model = GPTModel(
+        {
+            "vocab_size": 10,
+            "context_len": 5,
+            "emb_dim": 8,
+            "n_heads": 1,
+            "n_layers": 1,
+            "drop_rate": 0.0,
+            "qkv_bias": False,
+        }
+    )
+    idx = torch.randint(0, 10, (1, 3))
+    out = generate_text_simple(model, idx, max_new_tokens=2, context_size=5, temperature=1.5)
+    assert out.shape == (1, 5)
