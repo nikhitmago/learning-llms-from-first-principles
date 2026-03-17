@@ -79,6 +79,6 @@ def test_generate_text_simple_with_top_p() -> None:
     idx = torch.randint(0, 20, (1, 3))
     # Test with top_p=0.5
     out = generate_text_simple(
-        model, idx, max_new_tokens=2, context_size=5, temperature=1.0, top_p=0.5
+        model, idx, max_new_tokens=2, context_size=5, temperature=1.0, top_p=0.5, top_k=10
     )
     assert out.shape == (1, 5)
