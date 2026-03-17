@@ -13,7 +13,7 @@ from learning_llms_from_first_principles.utils.train_utils import train_model_v1
 
 
 @hydra.main(version_base=None, config_path="../config", config_name="train")
-def main(cfg: DictConfig) -> None:
+def main(cfg: DictConfig) -> tuple[GPTModel, list[float], list[float], list[float]]:
 
     print("\n" + "=" * 50)
     print("🚀 INITIALIZING PRE-TRAINING PIPELINE")
@@ -90,7 +90,7 @@ def main(cfg: DictConfig) -> None:
     print("=" * 50 + "\n")
 
     # Train
-    model, train_losses, val_losses = train_model_v1(
+    model, train_losses, val_losses, lrs = train_model_v1(
         model,
         train_loader,
         val_loader,
@@ -99,11 +99,16 @@ def main(cfg: DictConfig) -> None:
         num_epochs=cfg.training.num_epochs,
         eval_freq=cfg.training.eval_freq,
         tokenizer=tokenizer,
+        warmup_ratio=cfg.training.warmup_ratio,
+        warmup_min_lr=cfg.training.warmup_min_lr,
+        decay_floor_lr=cfg.training.decay_floor_lr,
     )
 
     print("\n" + "=" * 50)
     print("✅ Training complete.")
     print("=" * 50 + "\n")
+
+    return model, train_losses, val_losses, lrs
 
 
 if __name__ == "__main__":

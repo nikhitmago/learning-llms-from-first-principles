@@ -69,9 +69,22 @@ def train_model_v1(
     num_epochs: int,
     eval_freq: int,
     tokenizer: Any,
-) -> tuple[ModelT, list[float], list[float]]:
-    train_losses, val_losses = [], []
-    global_step = 0
+    warmup_ratio: float = 0.1,
+    warmup_min_lr: float = 3e-05,
+    decay_floor_lr: float = 1e-6,
+) -> tuple[ModelT, list[float], list[float], list[float]]:
+    train_losses, val_losses, lrs = [], [], []
+    global_step = -1
+
+    # Learning rate scheduling (warmup)
+    peak_lr = optimizer.param_groups[0]["lr"]
+    total_training_steps = num_epochs * len(train_loader)
+    warmup_steps = int(total_training_steps * warmup_ratio)
+    warmup_lr_increment = (peak_lr - warmup_min_lr) / warmup_steps
+
+    print(f"LR Schedule: Warmup for {warmup_steps} steps ({warmup_ratio*100:.1f}%)")
+    print(f" Warm up LR Range: {warmup_min_lr} -> {peak_lr}")
+    print(f"Total Training Steps: {total_training_steps}")
 
     for epoch in range(num_epochs):
         running_train_loss = 0.0
@@ -82,6 +95,16 @@ def train_model_v1(
             loss = calc_loss_batch(input_batch, target_batch, model, device)
             running_train_loss += loss.item()
             global_step += 1
+
+            # Adjust the warmup lr
+            if global_step < warmup_steps:
+                lr = warmup_min_lr + global_step * warmup_lr_increment
+            else:
+                lr = peak_lr
+
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = lr
+            lrs.append(lr)
 
             loss.backward()
             optimizer.step()
@@ -141,4 +164,4 @@ def train_model_v1(
 
         print("=" * 50 + "\n")
 
-    return model, train_losses, val_losses
+    return model, train_losses, val_losses, lrs

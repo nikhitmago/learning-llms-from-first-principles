@@ -30,6 +30,9 @@ def test_train_main(
                 "batch_size": 2,
                 "max_length": 64,
                 "stride": 32,
+                "warmup_ratio": 0.1,
+                "warmup_min_lr": 3e-05,
+                "decay_floor_lr": 1e-06,
             },
             "data": {"file_path": "dummy.txt", "train_ratio": 0.9, "val_ratio": 0.1},
             "model": {"name": "gpt2-small"},
@@ -39,7 +42,7 @@ def test_train_main(
     # Setup mocks
     mock_split.return_value = ("train", "val", "test")
     mock_get_device.return_value = "cpu"
-    mock_train_loop.return_value = (MagicMock(), [0.1], [0.1])
+    mock_train_loop.return_value = (MagicMock(), [0.1], [0.1], [0.1])
 
     # Fix: mock parameters() to return an iterable for the optimizer
     dummy_param = torch.nn.Parameter(torch.randn(1, 1))
