@@ -13,10 +13,10 @@ training:
   max_norm: 1.0
 
 data:
-  file_path: "/Users/nikmag/Documents/learning-llms-from-first-principles/src/learning_llms_from_first_principles/data/wikipedia_10mb.txt"
+  file_path: "${pkg_root:}/artifacts/wikipedia_10mb.txt"
   train_ratio: 0.999
   val_ratio: 0.001
 
 model:
   name: "gpt2-124m"
-  save_model_path: "~/gpt_model.pth"  # Set to null to skip saving
+  save_model_path: "${pkg_root:}/artifacts/gpt_model.pth"

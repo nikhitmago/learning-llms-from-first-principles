@@ -69,11 +69,33 @@ pretrain model.name=gpt2-large training.lr=0.001 training.num_epochs=10
 
 ---
 
+## Classification Fine-Tuning
+
+Fine-tune a pretrained GPT model for spam/ham text classification (based on Chapter 6 of the book). This requires a pretrained model checkpoint from the pre-training step above.
+
+### Usage
+
+Configuration lives in [`src/.../config/classify.yaml`](src/learning_llms_from_first_principles/config/classify.yaml). The spam dataset (SMS Spam Collection, balanced to 1494 samples) is shipped with the package.
+
+```bash
+# Run with the default pretrained checkpoint (saved by pretrain)
+classify model.pretrained_path=\${pkg_root:}/artifacts/gpt_model.pth
+
+# Override training parameters
+classify model.pretrained_path=\${pkg_root:}/artifacts/gpt_model.pth training.num_epochs=10 training.lr=1e-4
+```
+
+The pipeline freezes all layers except the last transformer block, final layer norm, and a new 2-class classification head. Training and test accuracy are logged at the end.
+
+---
+
 ## Project Structure
 
 - **`src/`**: Core logic and model architecture.
+    - **`artifacts/`**: Bundled data files (text corpora, CSV datasets).
     - **`config/`**: Centralized YAML configurations (Hydra).
-    - **`trainer/`**: Main training engine and CLI entry points.
+    - **`data/`**: Dataset classes and dataloaders.
+    - **`trainer/`**: Training engines and CLI entry points (`pretrain`, `classify`).
     - **`utils/`**: General helper functions (loss, device setup, etc.).
     - **`modules/`**: Neural network components (Attention, Transformers, etc.).
 - **`tests/`**: Unit and end-to-end tests.

@@ -10,7 +10,7 @@ def test_e2e_data_pipeline() -> None:
     # Path to data
     base_dir = os.path.dirname(os.path.dirname(__file__))
     data_path = os.path.join(
-        base_dir, "src", "learning_llms_from_first_principles", "data", "the-verdict.txt"
+        base_dir, "src", "learning_llms_from_first_principles", "artifacts", "the-verdict.txt"
     )
 
     assert os.path.exists(data_path), f"Data file not found at {data_path}"

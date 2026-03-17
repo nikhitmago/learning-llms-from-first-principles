@@ -1,3 +1,4 @@
+from learning_llms_from_first_principles.trainer.classify import main as classify_main
 from learning_llms_from_first_principles.trainer.train import main
 
-__all__ = ["main"]
+__all__ = ["main", "classify_main"]

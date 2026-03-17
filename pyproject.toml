@@ -23,6 +23,7 @@ dependencies = [
 
 [project.scripts]
 pretrain = "learning_llms_from_first_principles.trainer.train:main"
+classify = "learning_llms_from_first_principles.trainer.classify:main"
 
 [tool.hatch.envs.default]
 dependencies = [
