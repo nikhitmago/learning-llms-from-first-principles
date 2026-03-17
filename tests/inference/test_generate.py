@@ -42,3 +42,23 @@ def test_generate_text_simple_with_temp() -> None:
     idx = torch.randint(0, 10, (1, 3))
     out = generate_text_simple(model, idx, max_new_tokens=2, context_size=5, temperature=1.5)
     assert out.shape == (1, 5)
+
+
+def test_generate_text_simple_with_top_k() -> None:
+    model = GPTModel(
+        {
+            "vocab_size": 20,
+            "context_len": 5,
+            "emb_dim": 8,
+            "n_heads": 1,
+            "n_layers": 1,
+            "drop_rate": 0.0,
+            "qkv_bias": False,
+        }
+    )
+    idx = torch.randint(0, 20, (1, 3))
+    # Test with top_k=5
+    out = generate_text_simple(
+        model, idx, max_new_tokens=2, context_size=5, temperature=1.0, top_k=5
+    )
+    assert out.shape == (1, 5)

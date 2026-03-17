@@ -8,6 +8,7 @@ def generate_text_simple(
     max_new_tokens: int,
     context_size: int,
     temperature: float = 0.0,
+    top_k: int | None = None,
 ) -> torch.Tensor:
     """
     Generates text sequentially by repeatedly predicting the next token.
@@ -31,8 +32,15 @@ def generate_text_simple(
         with torch.no_grad():
             logits = model(idx_trunc)  # (bs, num_tokens, vocab_size)
 
-        # Focus only on the last time stamp/token
+        # Focus only on the last time stamp/token (next token over all vocab)
         logits = logits[:, -1, :]
+
+        # Add topK to make higher temp values less non-sensical so that fewer tokens are chosen from the vocab
+        if top_k is not None:
+            top_k_logits, top_k_ind = torch.topk(logits, top_k)  # bs, vocab_size
+            mask = torch.zeros_like(logits)
+            mask = ~mask.scatter(dim=-1, index=top_k_ind, value=1).bool()
+            logits.masked_fill_(mask, -torch.inf)
 
         # Apply temperature
         if temperature > 0:
