@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import logging
 import math
 from typing import Any, TypeVar
 
@@ -12,6 +11,8 @@ from learning_llms_from_first_principles.inference.generate import generate_text
 from learning_llms_from_first_principles.utils.tokenization_utils import token_ids_to_text
 
 ModelT = TypeVar("ModelT", bound=nn.Module)
+
+logger = logging.getLogger(__name__)
 
 
 def calc_loss_batch(
@@ -96,12 +97,12 @@ def train_model_v1(
     warmup_steps = int(total_training_steps * warmup_ratio)
     warmup_lr_increment = (peak_lr - warmup_min_lr) / warmup_steps
 
-    print(f"LR Schedule: Warmup for {warmup_steps} steps ({warmup_ratio*100:.1f}%)")
-    print(f" Warm up LR Range: {warmup_min_lr} -> {peak_lr}")
-    print(
+    logger.info(f"LR Schedule: Warmup for {warmup_steps} steps ({warmup_ratio*100:.1f}%)")
+    logger.info(f" Warm up LR Range: {warmup_min_lr} -> {peak_lr}")
+    logger.info(
         f" Cosine Annealing: {peak_lr} -> {decay_floor_lr} over {total_training_steps - warmup_steps} steps"
     )
-    print(f"Total Training Steps: {total_training_steps}")
+    logger.info(f"Total Training Steps: {total_training_steps}")
 
     for epoch in range(num_epochs):
         running_train_loss = 0.0
@@ -150,13 +151,13 @@ def train_model_v1(
                 train_loss = running_train_loss / (i + 1)
                 train_losses.append(train_loss)
                 val_losses.append(val_loss)
-                print(
+                logger.info(
                     f"Ep {epoch + 1} (Step {global_step:06d}): "
                     f"Train loss {train_loss:.3f}, Val loss {val_loss:.3f}"
                 )
 
         # --- Epoch-end reporting ---
-        print("\n" + "=" * 50 + "\n")
+        logger.info("\n" + "=" * 50 + "\n")
 
         model.eval()
         samples_printed = 0
@@ -189,13 +190,13 @@ def train_model_v1(
                     prefill_text = token_ids_to_text(prefill_ids, tokenizer)
                     decode_text = token_ids_to_text(decode_ids, tokenizer)
 
-                    print(f"--- Epoch {epoch+1} | Sample {samples_printed + 1} ---")
-                    print(f"PREFILL: {prefill_text}")
-                    print(f"DECODE:  {decode_text}")
-                    print("-" * 30 + "\n")
+                    logger.info(f"--- Epoch {epoch+1} | Sample {samples_printed + 1} ---")
+                    logger.info(f"PREFILL: {prefill_text}")
+                    logger.info(f"DECODE:  {decode_text}")
+                    logger.info("-" * 30 + "\n")
 
                     samples_printed += 1
 
-        print("=" * 50 + "\n")
+        logger.info("=" * 50 + "\n")
 
     return model, train_losses, val_losses, lrs

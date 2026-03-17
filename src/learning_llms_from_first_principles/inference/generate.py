@@ -3,7 +3,11 @@ import torch.nn as nn
 
 
 def generate_text_simple(
-    model: nn.Module, idx: torch.Tensor, max_new_tokens: int, context_size: int, temperature: float = 0.0
+    model: nn.Module,
+    idx: torch.Tensor,
+    max_new_tokens: int,
+    context_size: int,
+    temperature: float = 0.0,
 ) -> torch.Tensor:
     """
     Generates text sequentially by repeatedly predicting the next token.

@@ -1,3 +1,5 @@
+import logging
+
 import hydra
 import tiktoken
 import torch
@@ -11,28 +13,30 @@ from learning_llms_from_first_principles.utils.gpu_utils import get_device
 from learning_llms_from_first_principles.utils.model_utils import print_model_parameters
 from learning_llms_from_first_principles.utils.train_utils import train_model_v1
 
+logger = logging.getLogger(__name__)
+
 
 @hydra.main(version_base=None, config_path="../config", config_name="train")
 def main(cfg: DictConfig) -> tuple[GPTModel, list[float], list[float], list[float]]:
 
-    print("\n" + "=" * 50)
-    print("🚀 INITIALIZING PRE-TRAINING PIPELINE")
-    print("=" * 50)
+    logger.info("\n" + "=" * 50)
+    logger.info("🚀 INITIALIZING PRE-TRAINING PIPELINE")
+    logger.info("=" * 50)
 
-    print("\n[1/5] Loading Configuration...")
-    print("-" * 30)
-    print(OmegaConf.to_yaml(cfg))
+    logger.info("\n[1/5] Loading Configuration...")
+    logger.info("-" * 30)
+    logger.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
-    print("\n[2/5] Initializing Model...")
-    print("-" * 30)
+    logger.info("\n[2/5] Initializing Model...")
+    logger.info("-" * 30)
     tokenizer = tiktoken.get_encoding("gpt2")
     model = GPTModel(GPT_CONFIG_124M)
-    print(f"Model Name: {cfg.model.name}")
+    logger.info(f"Model Name: {cfg.model.name}")
     print_model_parameters(model)
 
     # Load data
-    print("\n[3/5] Processing Dataset...")
-    print("-" * 30)
+    logger.info("\n[3/5] Processing Dataset...")
+    logger.info("-" * 30)
     with open(cfg.data.file_path, "r", encoding="utf-8") as file:
         text_data = file.read()
 
@@ -40,13 +44,13 @@ def main(cfg: DictConfig) -> tuple[GPTModel, list[float], list[float], list[floa
     train_data, val_data, _ = split_data(
         text_data, train_ratio=cfg.data.train_ratio, val_ratio=cfg.data.val_ratio
     )
-    print(f"Source file: {cfg.data.file_path}")
-    print(f"Training data size:   {len(train_data)} chars")
-    print(f"Validation data size: {len(val_data)} chars")
+    logger.info(f"Source file: {cfg.data.file_path}")
+    logger.info(f"Training data size:   {len(train_data)} chars")
+    logger.info(f"Validation data size: {len(val_data)} chars")
 
     # Create loaders
-    print("\n[4/5] Creating Dataloaders...")
-    print("-" * 30)
+    logger.info("\n[4/5] Creating Dataloaders...")
+    logger.info("-" * 30)
     train_loader = create_dataloader_v1(
         train_data,
         batch_size=cfg.training.batch_size,
@@ -68,26 +72,28 @@ def main(cfg: DictConfig) -> tuple[GPTModel, list[float], list[float], list[floa
         num_workers=0,
         tokenizer=tokenizer,
     )
-    print(f"Train batches: {len(train_loader)}")
-    print(f"Val batches:   {len(val_loader)}")
+    logger.info(f"Train batches: {len(train_loader)}")
+    logger.info(f"Val batches:   {len(val_loader)}")
 
     # Device setup
-    print("\n[5/5] Finalizing Environment...")
-    print("-" * 30)
+    logger.info("\n[5/5] Finalizing Environment...")
+    logger.info("-" * 30)
     device = get_device()
-    print(f"Device detected: {device}")
+    logger.info(f"Device detected: {device}")
     model.to(device)
-    print("Model moved to device.")
+    logger.info("Model moved to device.")
 
     # Optimizer setup
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=cfg.training.lr, weight_decay=cfg.training.weight_decay
     )
-    print(f"Optimizer: AdamW (lr={cfg.training.lr}, weight_decay={cfg.training.weight_decay})")
+    logger.info(
+        f"Optimizer: AdamW (lr={cfg.training.lr}, weight_decay={cfg.training.weight_decay})"
+    )
 
-    print("\n" + "=" * 50)
-    print("✨ STARTING TRAINING LOOP")
-    print("=" * 50 + "\n")
+    logger.info("\n" + "=" * 50)
+    logger.info("✨ STARTING TRAINING LOOP")
+    logger.info("=" * 50 + "\n")
 
     # Train
     model, train_losses, val_losses, lrs = train_model_v1(
@@ -105,9 +111,9 @@ def main(cfg: DictConfig) -> tuple[GPTModel, list[float], list[float], list[floa
         max_norm=cfg.training.max_norm,
     )
 
-    print("\n" + "=" * 50)
-    print("✅ Training complete.")
-    print("=" * 50 + "\n")
+    logger.info("\n" + "=" * 50)
+    logger.info("✅ Training complete.")
+    logger.info("=" * 50 + "\n")
 
     return model, train_losses, val_losses, lrs
 
