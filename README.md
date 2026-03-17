@@ -78,11 +78,11 @@ Fine-tune a pretrained GPT model for spam/ham text classification (based on Chap
 Configuration lives in [`src/.../config/classify.yaml`](src/learning_llms_from_first_principles/config/classify.yaml). The spam dataset (SMS Spam Collection, balanced to 1494 samples) is shipped with the package.
 
 ```bash
-# Run with the default pretrained checkpoint (saved by pretrain)
-classify model.pretrained_path=\${pkg_root:}/artifacts/gpt_model.pth
+# Run with default settings (uses pretrained weights from artifacts/)
+classify
 
 # Override training parameters
-classify model.pretrained_path=\${pkg_root:}/artifacts/gpt_model.pth training.num_epochs=10 training.lr=1e-4
+classify training.num_epochs=10 training.lr=1e-4
 ```
 
 The pipeline freezes all layers except the last transformer block, final layer norm, and a new 2-class classification head. Training and test accuracy are logged at the end.

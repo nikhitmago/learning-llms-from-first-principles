@@ -8,14 +8,10 @@ training:
   num_workers: 0
 
 data:
-  # Path to the combined CSV with columns: Text, Label, split
-  # Defaults to the CSV shipped with the package
   file_path: "${pkg_root:}/artifacts/spam_data.csv"
 
 model:
   name: "gpt2-124m"
   num_classes: 2
-  # Path to pretrained state dict (required — fine-tuning random weights is pointless)
-  pretrained_path: ???
-  # Path to save the fine-tuned classifier state dict (null = skip)
+  pretrained_path: "${pkg_root:}/artifacts/gpt_model.pth"
   save_model_path: "${pkg_root:}/artifacts/gpt_classifier.pth"
