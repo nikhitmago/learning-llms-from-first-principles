@@ -125,6 +125,7 @@ def test_train_model_warmup() -> None:
         warmup_ratio=0.5,
         warmup_min_lr=warmup_min_lr,
         decay_floor_lr=decay_floor_lr,
+        max_norm=1.0,
     )
 
     # Check first step (global_step 0)
@@ -151,3 +152,40 @@ def test_train_model_warmup() -> None:
 
     # Verify total number of recorded LRs
     assert len(lrs) == 20
+
+
+@pytest.mark.parametrize("max_norm", [0.5, 1.0, 5.0])
+def test_train_model_grad_clipping(max_norm: float) -> None:
+    vocab_size = 10
+    model = DummyModel(vocab_size)
+    device = torch.device("cpu")
+    dataset = DummyDataset(vocab_size=vocab_size)
+    loader = DataLoader(dataset, batch_size=2)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.01)
+
+    class DummyTokenizer:
+        def encode(self, text: str, **kwargs: Any) -> list[int]:
+            return [1]
+
+        def decode(self, ids: list[int]) -> str:
+            return ""
+
+    with pytest.importorskip("unittest.mock").patch("torch.nn.utils.clip_grad_norm_") as mock_clip:
+        train_model_v1(
+            model,
+            loader,
+            loader,
+            optimizer,
+            device,
+            num_epochs=1,
+            eval_freq=100,
+            tokenizer=DummyTokenizer(),
+            max_norm=max_norm,
+        )
+
+        # Ensure it was called for every batch (10 batches in DummyDataset with bs=2)
+        assert mock_clip.call_count == 10
+        # Check that it was called with the correct max_norm
+        # The first argument is model.parameters(), second is max_norm
+        args, kwargs = mock_clip.call_args
+        assert kwargs["max_norm"] == max_norm

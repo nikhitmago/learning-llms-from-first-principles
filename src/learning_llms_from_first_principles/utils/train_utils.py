@@ -73,6 +73,7 @@ def train_model_v1(
     warmup_ratio: float = 0.1,
     warmup_min_lr: float = 3e-05,
     decay_floor_lr: float = 1e-6,
+    max_norm: float = 1.0,
 ) -> tuple[ModelT, list[float], list[float], list[float]]:
     train_losses, val_losses, lrs = [], [], []
     global_step = -1
@@ -115,6 +116,18 @@ def train_model_v1(
             lrs.append(lr)
 
             loss.backward()
+
+            # Gradient Clipping (Global Level)
+            # This treats ALL model parameters (e.g., all 32B parameters in a 32B model)
+            # as a single giant vector to ensure the total update doesn't explode.
+            #
+            # Pseudo-code logic:
+            # grad_norm = torch.sqrt(torch.square(grads).sum())
+            # if grad_norm > max_norm:
+            #     scale = max_norm / grad_norm
+            #     grads = grads * scale
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm)
+
             optimizer.step()
 
             # Print intermediate progress based on global steps

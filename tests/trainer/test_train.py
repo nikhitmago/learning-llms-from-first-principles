@@ -33,6 +33,7 @@ def test_train_main(
                 "warmup_ratio": 0.1,
                 "warmup_min_lr": 3e-05,
                 "decay_floor_lr": 1e-06,
+                "max_norm": 1.0,
             },
             "data": {"file_path": "dummy.txt", "train_ratio": 0.9, "val_ratio": 0.1},
             "model": {"name": "gpt2-small"},

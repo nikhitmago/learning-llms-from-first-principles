@@ -102,6 +102,7 @@ def main(cfg: DictConfig) -> tuple[GPTModel, list[float], list[float], list[floa
         warmup_ratio=cfg.training.warmup_ratio,
         warmup_min_lr=cfg.training.warmup_min_lr,
         decay_floor_lr=cfg.training.decay_floor_lr,
+        max_norm=cfg.training.max_norm,
     )
 
     print("\n" + "=" * 50)
