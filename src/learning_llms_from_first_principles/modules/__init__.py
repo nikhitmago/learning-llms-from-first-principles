@@ -4,6 +4,7 @@ from learning_llms_from_first_principles.modules.attention import (
     MultiHeadAttentionWrapper,
     SelfAttention,
 )
+from learning_llms_from_first_principles.modules.feedforward import GELU, Feedforward
 from learning_llms_from_first_principles.modules.gpt import GPTModel
 from learning_llms_from_first_principles.modules.norm import LayerNorm
 from learning_llms_from_first_principles.modules.transformer import TransformerBlock
@@ -13,6 +14,8 @@ __all__ = [
     "MultiHeadAttentionWrapper",
     "MultiHeadAttentionWeightSplits",
     "MultiHeadAttentionCombinedQKV",
+    "GELU",
+    "Feedforward",
     "GPTModel",
     "LayerNorm",
     "TransformerBlock",
