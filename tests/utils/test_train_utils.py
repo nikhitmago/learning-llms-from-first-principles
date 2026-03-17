@@ -83,11 +83,11 @@ def test_train_model_v1() -> None:
     tokenizer = DummyTokenizer()
 
     model, train_losses, val_losses, lrs = train_model_v1(
-        model, loader, loader, optimizer, device, num_epochs=1, eval_freq=100, tokenizer=tokenizer
+        model, loader, loader, optimizer, device, num_epochs=1, eval_freq=6, tokenizer=tokenizer
     )
 
     assert isinstance(model, nn.Module)
-    assert len(train_losses) == 1  # Evaluation happens at Step 0
+    assert len(train_losses) == 1  # Evaluation happens at Step 6
     assert len(val_losses) == 1
 
 

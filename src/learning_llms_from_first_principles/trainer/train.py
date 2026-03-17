@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import hydra
 import tiktoken
@@ -114,6 +115,12 @@ def main(cfg: DictConfig) -> tuple[GPTModel, list[float], list[float], list[floa
     logger.info("\n" + "=" * 50)
     logger.info("✅ Training complete.")
     logger.info("=" * 50 + "\n")
+
+    if cfg.model.save_model_path:
+        save_path = Path(cfg.model.save_model_path).expanduser()
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(model.state_dict(), save_path)
+        logger.info(f"💾 Model state dict saved to: {save_path}")
 
     return model, train_losses, val_losses, lrs
 

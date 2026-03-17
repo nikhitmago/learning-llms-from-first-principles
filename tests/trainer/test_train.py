@@ -36,7 +36,7 @@ def test_train_main(
                 "max_norm": 1.0,
             },
             "data": {"file_path": "dummy.txt", "train_ratio": 0.9, "val_ratio": 0.1},
-            "model": {"name": "gpt2-small"},
+            "model": {"name": "gpt2-small", "save_model_path": None},
         }
     )
 

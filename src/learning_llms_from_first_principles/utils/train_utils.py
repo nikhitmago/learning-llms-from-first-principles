@@ -1,5 +1,6 @@
 import logging
 import math
+import time
 from typing import Any, TypeVar
 
 import torch
@@ -27,27 +28,16 @@ def calc_loss_batch(
     logits_flattened = logits.view(-1, vocab_size)  # [bs * seq_len, vocab_size]
     targets_flattened = target_batch.view(-1)  # [bs * seq_len]
 
-    # Use torch to calculate the CE loss
+    # Use torch to calculate the CE loss (Optimized and Fused for GPU/MPS)
     loss_lib = nn.CrossEntropyLoss()(logits_flattened, targets_flattened)
 
-    # Calculate CE loss from scratch
+    # Note: Pedogogical CE loss from scratch (Disabled for Performance)
     # Intuition: Cross Entropy (CE) measures "Surprise" (Information Theory).
-    # If the model gives the correct label a probability of 0.4 (40% confident),
-    # the remaining 0.6 represents the "missing confidence" the model is penalized for.
-    # We use -ln(P) because it scales non-linearly: as P approaches 0, the penalty
-    # explodes, forcing the model to learn much faster from its biggest mistakes.
-    #
-    # Examples of CE Loss relative to Correct Class Probability (P):
-    # P=0.1 -> Loss: 2.302 (Extreme Surprise/Penalty)
-    # P=0.4 -> Loss: 0.916 (Significant Surprise/Penalty)
-    # P=0.5 -> Loss: 0.693 (Coin Toss)
-    # P=0.8 -> Loss: 0.223 (Low Surprise)
-    # P=0.9 -> Loss: 0.105 (Near-Perfect Confidence)
-    probs_flattened = torch.softmax(logits_flattened, dim=-1)  # [bs * seq_len, vocab_size]
-    probs_values = probs_flattened[torch.arange(probs_flattened.shape[0]), targets_flattened]
-    loss_ce_scratch = -torch.log(probs_values).mean()
-
-    assert torch.allclose(loss_lib, loss_ce_scratch)
+    # Each class has a probability P. We use -ln(P) for loss because as P -> 0, penalty explodes.
+    # probs_flattened = torch.softmax(logits_flattened, dim=-1)
+    # probs_values = probs_flattened[torch.arange(probs_flattened.shape[0]), targets_flattened]
+    # loss_ce_scratch = -torch.log(probs_values).mean()
+    # assert torch.allclose(loss_lib, loss_ce_scratch)
 
     return loss_lib
 
@@ -106,6 +96,7 @@ def train_model_v1(
 
     for epoch in range(num_epochs):
         running_train_loss = 0.0
+        train_start_time = time.time()
         for i, (input_batch, target_batch) in enumerate(train_loader):
             model.train()
             optimizer.zero_grad()
@@ -144,17 +135,26 @@ def train_model_v1(
             optimizer.step()
 
             # Print intermediate progress based on global steps
-            if global_step % eval_freq == 0:
+            if global_step % eval_freq == 0 and global_step > 0:
+                train_time = time.time() - train_start_time
+
                 model.eval()
+                val_start_time = time.time()
                 with torch.no_grad():
                     val_loss = calc_loss_loader(val_loader, model, device)
+                val_time = time.time() - val_start_time
+
                 train_loss = running_train_loss / (i + 1)
                 train_losses.append(train_loss)
                 val_losses.append(val_loss)
                 logger.info(
                     f"Ep {epoch + 1} (Step {global_step:06d}): "
-                    f"Train loss {train_loss:.3f}, Val loss {val_loss:.3f}"
+                    f"Train loss {train_loss:.3f}, Val loss {val_loss:.3f} "
+                    f"[Train: {train_time:.1f}s, Val: {val_time:.1f}s]"
                 )
+
+                # Reset training clock for next period
+                train_start_time = time.time()
 
         # --- Epoch-end reporting ---
         logger.info("\n" + "=" * 50 + "\n")
