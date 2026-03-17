@@ -9,6 +9,7 @@ def generate_text_simple(
     context_size: int,
     temperature: float = 0.0,
     top_k: int | None = None,
+    top_p: float | None = None,
 ) -> torch.Tensor:
     """
     Generates text sequentially by repeatedly predicting the next token.
@@ -45,8 +46,39 @@ def generate_text_simple(
         # Apply temperature
         if temperature > 0:
             # Stochastic Sampling: Scale logits and roll the dice (multinomial)
-            logits_scaled = logits / temperature
-            probs = torch.softmax(logits_scaled, dim=-1)
+            logits = logits / temperature
+
+            # Top-P (Nucleus Sampling): Dynamic filtering. We keep the smallest set of tokens that
+            # sum to P% probability. This narrows the pool when the model is confident (high
+            # precision) and expands it when it's uncertain (high diversity).
+            if top_p is not None:
+                # Sort probabilities and calculate cumulative sum
+                probs_logits = torch.softmax(logits, dim=-1)
+                sorted_probs, sorted_ind = torch.sort(probs_logits, dim=-1, descending=True)
+                cumsum_probs = torch.cumsum(sorted_probs, dim=-1)
+
+                # Create mask
+                mask = cumsum_probs < top_p
+                # Rule: Keep the smallest set of tokens that sum to >= top_p.
+                # Example: top_p = 0.5, sorted_probs = [0.4, 0.3, 0.2, 0.1]
+                #   1. cumsum = [0.4, 0.7, 0.9, 1.0]
+                #   2. mask = (cumsum < top_p) -> [True, False, False, False]
+                #      Note: 0.4 isn't enough to reach 0.5. We NEED the 0.3 token too.
+                #
+                #   3. Right shift by 1: mask = [True, True, False, False]
+                #      Now the 0.3 token (which pushed us over 0.5) is correctly KEPT.
+                mask[:, 1:] = mask[:, :-1].clone()
+                # Always keep at least the #1 most likely token, so that atleast 1 token is chosen
+                mask[:, 0] = True
+
+                # Apply mask to un-sorted probs/logits (mask re-arranging)
+                new_mask = torch.zeros_like(logits, dtype=torch.bool)
+                new_mask.scatter_(dim=-1, index=sorted_ind, src=mask)
+
+                # Flip the mask for masked fill and add -torch.inf where value is "True"
+                logits.masked_fill_(~new_mask, -torch.inf)
+
+            probs = torch.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
 
         else:
