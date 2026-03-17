@@ -30,6 +30,18 @@ def calc_loss_batch(
     loss_lib = nn.CrossEntropyLoss()(logits_flattened, targets_flattened)
 
     # Calculate CE loss from scratch
+    # Intuition: Cross Entropy (CE) measures "Surprise" (Information Theory).
+    # If the model gives the correct label a probability of 0.4 (40% confident),
+    # the remaining 0.6 represents the "missing confidence" the model is penalized for.
+    # We use -ln(P) because it scales non-linearly: as P approaches 0, the penalty
+    # explodes, forcing the model to learn much faster from its biggest mistakes.
+    #
+    # Examples of CE Loss relative to Correct Class Probability (P):
+    # P=0.1 -> Loss: 2.302 (Extreme Surprise/Penalty)
+    # P=0.4 -> Loss: 0.916 (Significant Surprise/Penalty)
+    # P=0.5 -> Loss: 0.693 (Coin Toss)
+    # P=0.8 -> Loss: 0.223 (Low Surprise)
+    # P=0.9 -> Loss: 0.105 (Near-Perfect Confidence)
     probs_flattened = torch.softmax(logits_flattened, dim=-1)  # [bs * seq_len, vocab_size]
     probs_values = probs_flattened[torch.arange(probs_flattened.shape[0]), targets_flattened]
     loss_ce_scratch = -torch.log(probs_values).mean()
