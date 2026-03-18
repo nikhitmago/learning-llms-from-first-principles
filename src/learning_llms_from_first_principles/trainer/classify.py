@@ -10,6 +10,11 @@ from learning_llms_from_first_principles.config import GPT_CONFIG_124M
 from learning_llms_from_first_principles.data.dataloader import create_classify_dataloader
 from learning_llms_from_first_principles.data.datasets import Split
 from learning_llms_from_first_principles.modules.gpt import GPTModel
+from learning_llms_from_first_principles.modules.peft import (
+    merge_lora_weights,
+    replace_linear_with_lora,
+    save_lora_adapters,
+)
 from learning_llms_from_first_principles.utils.classify_utils import (
     calc_accuracy_loader,
     train_classifier,
@@ -52,22 +57,31 @@ def main(cfg: DictConfig) -> GPTModel:
     logger.info(f"Loading pretrained weights from: {pretrained_path}")
     model.load_state_dict(torch.load(pretrained_path, weights_only=True))
 
-    # Freeze all parameters
     for param in model.parameters():
         param.requires_grad = False
 
-    # Replace the language-model head with a classification head
+    use_lora = cfg.lora.enabled
+
+    if use_lora:
+        logger.info(f"\n🔧 LoRA enabled (rank={cfg.lora.rank}, alpha={cfg.lora.alpha})")
+        logger.info("Before LoRA:")
+        print_model_parameters(model)
+
+        replace_linear_with_lora(model, rank=cfg.lora.rank, alpha=cfg.lora.alpha)
+
     num_classes: int = cfg.model.num_classes
     model.out_head = torch.nn.Linear(
         in_features=int(GPT_CONFIG_124M["emb_dim"]), out_features=num_classes
     )
 
-    # Unfreeze: last transformer block + final layer norm + new out_head
-    for param in model.trf_blocks[-1].parameters():
-        param.requires_grad = True
-    for param in model.final_norm.parameters():
-        param.requires_grad = True
-    # out_head is newly created, requires_grad=True by default
+    if not use_lora:
+        for param in model.trf_blocks[-1].parameters():
+            param.requires_grad = True
+        for param in model.final_norm.parameters():
+            param.requires_grad = True
+
+    if use_lora:
+        logger.info("\nAfter LoRA + classification head:")
 
     model.to(device)
     logger.info(f"Model Name: {cfg.model.name} | Classification head: {num_classes} classes")
@@ -158,6 +172,18 @@ def main(cfg: DictConfig) -> GPTModel:
     logger.info("\n" + "=" * 50)
     logger.info("✅ Fine-tuning complete.")
     logger.info("=" * 50 + "\n")
+
+    if use_lora:
+        if cfg.lora.save_adapter_path:
+            adapter_path = Path(cfg.lora.save_adapter_path).expanduser()
+            adapter_path.parent.mkdir(parents=True, exist_ok=True)
+            save_lora_adapters(model, str(adapter_path))
+            logger.info(f"💾 LoRA adapters saved to: {adapter_path}")
+
+        if cfg.lora.merge_after_training:
+            merge_lora_weights(model)
+            logger.info("🔀 LoRA weights merged into base model")
+            print_model_parameters(model)
 
     if cfg.model.save_model_path:
         save_path = Path(cfg.model.save_model_path).expanduser()

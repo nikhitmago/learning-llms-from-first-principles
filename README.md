@@ -78,14 +78,22 @@ Fine-tune a pretrained GPT model for spam/ham text classification (based on Chap
 Configuration lives in [`src/.../config/classify.yaml`](src/learning_llms_from_first_principles/config/classify.yaml). The spam dataset (SMS Spam Collection, balanced to 1494 samples) is shipped with the package.
 
 ```bash
-# Run with default settings (uses pretrained weights from artifacts/)
+# Run with default settings (LoRA enabled by default)
 classify
+
+# Disable LoRA and use standard fine-tuning
+classify lora.enabled=false
+
+# Customize LoRA rank and alpha
+classify lora.rank=8 lora.alpha=8
 
 # Override training parameters
 classify training.num_epochs=10 training.lr=1e-4
 ```
 
-The pipeline freezes all layers except the last transformer block, final layer norm, and a new 2-class classification head. Training and test accuracy are logged at the end.
+LoRA (Low-Rank Adaptation) is enabled by default. Instead of updating all 124M parameters, it freezes the pretrained weights and injects small trainable adapter matrices (A and B) into every Linear layer — typically training only ~2-3% of the total parameters. After training, the adapters are saved separately and then merged back into the base weights for zero-overhead inference.
+
+When LoRA is disabled, the pipeline falls back to the standard approach: freezing all layers except the last transformer block, final layer norm, and the classification head.
 
 ---
 

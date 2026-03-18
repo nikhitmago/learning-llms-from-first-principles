@@ -15,3 +15,10 @@ model:
   num_classes: 2
   pretrained_path: "${pkg_root:}/artifacts/gpt_model.pth"
   save_model_path: "${pkg_root:}/artifacts/gpt_classifier.pth"
+
+lora:
+  enabled: true
+  rank: 16
+  alpha: 16
+  save_adapter_path: "${pkg_root:}/artifacts/lora_adapters.pth"
+  merge_after_training: true
