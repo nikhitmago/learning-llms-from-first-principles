@@ -4,6 +4,8 @@ import torch.nn as nn
 
 class SelfAttention(nn.Module):
     mask: torch.Tensor
+    cache_k: torch.Tensor | None
+    cache_v: torch.Tensor | None
 
     def __init__(self, d_emb: int, d_attn: int, context_len: int, dropout: float) -> None:
         super().__init__()
@@ -16,25 +18,86 @@ class SelfAttention(nn.Module):
             "mask", torch.triu(torch.ones(context_len, context_len), diagonal=1).bool()
         )  # Registers a non-trainable tensor that moves with the model across devices (CPU/GPU) and is included in the saved state.
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Register optional KV cache buffers
+        # persistent=False means the buffer lives on the module (moves with .to(device),
+        # shows up in model.state_dict() calls during runtime)
+        # but does not get saved when you torch.save(model.state_dict())
+        self.register_buffer("cache_k", None, persistent=False)
+        self.register_buffer("cache_v", None, persistent=False)
+        self.cur_pos = 0
+
+    def forward(self, x: torch.Tensor, use_kv_cache: bool = False) -> torch.Tensor:
         bs, cur_context_len, d_emb = (
             x.shape
         )  # context len can be shorter at inference time when doing one at a time token processing
 
         # bs, context_len, d_attn
-        queries = self.W_q(x)
-        keys = self.W_k(x)
-        values = self.W_v(x)
+        queries = self.W_q(
+            x
+        )  # for kv cache, queries will be one word at a time in inference (bs, 1, d_attn)
+        keys_new = self.W_k(x)
+        values_new = self.W_v(x)
+
+        if use_kv_cache:
+            # KV Cache: avoid recomputing keys/values for all previous tokens.
+            #
+            # PREFILL (first call, e.g. prompt "I am good"):
+            #   cache is None → store all 3 key/value vectors
+            #   cache_k shape: (bs, 3, d_attn)
+            #
+            # DECODE (subsequent calls, one new token at a time):
+            #   cache exists → append the 1 new key/value to the cache
+            #   cache_k shape: (bs, 4, d_attn), then (bs, 5, d_attn), etc.
+            #
+            # In both cases, queries only cover the NEW tokens,
+            # but keys/values span ALL tokens seen so far.
+            if self.cache_k is None:
+                self.cache_k, self.cache_v = keys_new, values_new
+            else:
+                assert self.cache_k is not None and self.cache_v is not None
+                self.cache_k = torch.cat([self.cache_k, keys_new], dim=1)
+                self.cache_v = torch.cat([self.cache_v, values_new], dim=1)
+            keys, values = self.cache_k, self.cache_v
+        else:
+            keys, values = keys_new, values_new
 
         # attention scores: bs, context_len, context_len
+        # if kv cache: (bs, 1, d_attn) x (bs, d_attn, context_len) => (bs, 1, context_len)
         attn_scores = queries @ keys.transpose(
             1, 2
         )  # .T won't work becasu ootb cuz there is batch dim
 
-        # allow masking sequences shorter than max context_len by slicing the mask: bs, cur_context_len, cur_context_len
-        attn_scores = attn_scores.masked_fill(
-            self.mask[:cur_context_len, :cur_context_len], -torch.inf
-        )
+        # Masking: cur_pos tracks which row of the causal mask we're on.
+        #
+        # PREFILL (prompt "I am good", cur_pos=0):
+        #   num_tokens_queries=3, num_tokens_keys=3
+        #   mask slice: self.mask[0:3, :3]  →  standard 3×3 causal mask
+        #   cur_pos advances to 3
+        #
+        # DECODE step 1 (token 4, cur_pos=3):
+        #   num_tokens_queries=1, num_tokens_keys=4
+        #   mask slice: self.mask[3:4, :4]  →  [False, False, False, False]
+        #   All False = attend to everything. Causality is already enforced
+        #   because future tokens simply aren't in the cache yet.
+        #   cur_pos advances to 4
+        #
+        # Without cache: just slice the top-left corner of the mask as usual.
+        num_tokens_queries = queries.shape[1]
+        num_tokens_keys = keys.shape[1]
+
+        if use_kv_cache:
+            attn_scores = attn_scores.masked_fill(
+                self.mask[
+                    self.cur_pos : self.cur_pos + num_tokens_queries,
+                    :num_tokens_keys,
+                ],
+                -torch.inf,
+            )
+            self.cur_pos += num_tokens_queries
+        else:
+            attn_scores = attn_scores.masked_fill(
+                self.mask[:num_tokens_queries, :num_tokens_keys], -torch.inf
+            )
 
         # attention weights: apply softmax after normalizing with key's d_attn dim
         attn_weights = torch.softmax(attn_scores / (keys.shape[-1] ** 0.5), dim=-1)
@@ -47,6 +110,10 @@ class SelfAttention(nn.Module):
             attn_weights @ values
         )  # Matrix-multiplies the (6, 6) mask against each element in the (10, 6, 2) batch by broadcasting across the batch dimension.
         return context_vec
+
+    def reset_kv_cache(self) -> None:
+        self.cache_k, self.cache_v = None, None
+        self.cur_pos = 0
 
 
 class MultiHeadAttentionWrapper(nn.Module):
@@ -61,8 +128,8 @@ class MultiHeadAttentionWrapper(nn.Module):
             [SelfAttention(d_emb, d_attn, context_len, dropout) for i in range(num_heads)]
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.cat([head(x) for head in self.heads], dim=-1)
+    def forward(self, x: torch.Tensor, use_kv_cache: bool = False) -> torch.Tensor:
+        return torch.cat([head(x, use_kv_cache=use_kv_cache) for head in self.heads], dim=-1)
 
 
 class MultiHeadAttentionWeightSplits(nn.Module):
