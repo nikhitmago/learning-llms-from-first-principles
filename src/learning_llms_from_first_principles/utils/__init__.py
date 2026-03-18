@@ -10,6 +10,12 @@ from learning_llms_from_first_principles.utils.model_utils import (
     print_model_parameters,
     print_transformer_block_parameters,
 )
+from learning_llms_from_first_principles.utils.peft_utils import (
+    load_lora_adapters,
+    merge_lora_weights,
+    replace_linear_with_lora,
+    save_lora_adapters,
+)
 from learning_llms_from_first_principles.utils.tokenization_utils import (
     text_to_token_ids,
     token_ids_to_text,
@@ -34,4 +40,8 @@ __all__ = [
     "calc_loss_loader_classify",
     "calc_accuracy_loader",
     "train_classifier",
+    "load_lora_adapters",
+    "merge_lora_weights",
+    "replace_linear_with_lora",
+    "save_lora_adapters",
 ]

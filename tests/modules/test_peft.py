@@ -6,8 +6,8 @@ import torch.nn as nn
 from learning_llms_from_first_principles.modules.peft import (
     LinearLoRA,
     LoRALayer,
-    replace_linear_with_lora,
 )
+from learning_llms_from_first_principles.utils.peft_utils import replace_linear_with_lora
 
 
 def test_lora_layer_output_shape() -> None:
@@ -72,7 +72,7 @@ def test_replace_linear_with_lora_param_count() -> None:
 
 
 def test_save_and_load_lora_adapters(tmp_path: Path) -> None:
-    from learning_llms_from_first_principles.modules.peft import (
+    from learning_llms_from_first_principles.utils.peft_utils import (
         load_lora_adapters,
         save_lora_adapters,
     )
@@ -101,7 +101,7 @@ def test_save_and_load_lora_adapters(tmp_path: Path) -> None:
 
 
 def test_merge_lora_weights() -> None:
-    from learning_llms_from_first_principles.modules.peft import merge_lora_weights
+    from learning_llms_from_first_principles.utils.peft_utils import merge_lora_weights
 
     linear = nn.Linear(8, 8)
     model = nn.Sequential(linear)
@@ -122,7 +122,7 @@ def test_merge_lora_weights() -> None:
 
 
 def test_merge_removes_lora_from_state_dict() -> None:
-    from learning_llms_from_first_principles.modules.peft import merge_lora_weights
+    from learning_llms_from_first_principles.utils.peft_utils import merge_lora_weights
 
     model = nn.Sequential(nn.Linear(8, 8), nn.ReLU(), nn.Linear(8, 4))
     replace_linear_with_lora(model, rank=2, alpha=1.0)

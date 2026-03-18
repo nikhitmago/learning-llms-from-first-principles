@@ -10,17 +10,17 @@ from learning_llms_from_first_principles.config import GPT_CONFIG_124M
 from learning_llms_from_first_principles.data.dataloader import create_classify_dataloader
 from learning_llms_from_first_principles.data.datasets import Split
 from learning_llms_from_first_principles.modules.gpt import GPTModel
-from learning_llms_from_first_principles.modules.peft import (
-    merge_lora_weights,
-    replace_linear_with_lora,
-    save_lora_adapters,
-)
 from learning_llms_from_first_principles.utils.classify_utils import (
     calc_accuracy_loader,
     train_classifier,
 )
 from learning_llms_from_first_principles.utils.gpu_utils import get_device
 from learning_llms_from_first_principles.utils.model_utils import print_model_parameters
+from learning_llms_from_first_principles.utils.peft_utils import (
+    merge_lora_weights,
+    replace_linear_with_lora,
+    save_lora_adapters,
+)
 
 logger = logging.getLogger(__name__)
 
