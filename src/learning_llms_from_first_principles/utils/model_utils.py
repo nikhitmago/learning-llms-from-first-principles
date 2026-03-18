@@ -12,50 +12,42 @@ def print_model_parameters(model: nn.Module) -> None:
     Prints the parameter count for each top-level module in the network.
 
     Example Output:
-    Layer Name           |      Parameters
-    --------------------------------------
-    tok_emb              |      38,597,376
-    pos_emb              |         786,432
-    trf_blocks.0         |       7,085,568
-    trf_blocks.1         |       7,085,568
-    trf_blocks.2         |       7,085,568
-    trf_blocks.3         |       7,085,568
-    trf_blocks.4         |       7,085,568
-    trf_blocks.5         |       7,085,568
-    trf_blocks.6         |       7,085,568
-    trf_blocks.7         |       7,085,568
-    trf_blocks.8         |       7,085,568
-    trf_blocks.9         |       7,085,568
-    trf_blocks.10        |       7,085,568
-    trf_blocks.11        |       7,085,568
-    final_norm           |           1,536
-    out_head             |      38,597,376
-    --------------------------------------
-    Total Parameters     |     163,009,536
+    Layer Name           |      Parameters |      Trainable
+    --------------------------------------------------------
+    tok_emb              |      38,597,376 |      38,597,376
+    pos_emb              |         786,432 |         786,432
+    trf_blocks.0         |       7,085,568 |       7,085,568
+    ...
+    out_head             |      38,597,376 |      38,597,376
+    --------------------------------------------------------
+    Total                |     163,009,536 |     163,009,536
     """
     layer_params: typing.DefaultDict[str, int] = defaultdict(int)
+    layer_trainable: typing.DefaultDict[str, int] = defaultdict(int)
 
-    # Group parameters by their top-level module name
     for name, param in model.named_parameters():
-        # Split the name by '.' to group by the highest-level component
-        # e.g., 'trf_blocks.0.layer_norm_1.scale' -> 'trf_blocks.0'
         parts = name.split(".")
         if parts[0] == "trf_blocks":
-            # Group each transformer block separately
             top_layer = f"{parts[0]}.{parts[1]}"
         else:
-            # For top-level embeddings and output head
             top_layer = parts[0]
 
         layer_params[top_layer] += param.numel()
+        if param.requires_grad:
+            layer_trainable[top_layer] += param.numel()
 
-    logger.info(f"{'Layer Name':<20} | {'Parameters':>15}")
-    logger.info("-" * 38)
-    for layer, count in layer_params.items():
-        logger.info(f"{layer:<20} | {count:>15,}")
+    logger.info(f"{'Layer Name':<20} | {'Parameters':>15} | {'Trainable':>15} | {'Frozen':>15}")
+    logger.info("-" * 74)
+    for layer in layer_params:
+        trainable = layer_trainable.get(layer, 0)
+        frozen = layer_params[layer] - trainable
+        logger.info(f"{layer:<20} | {layer_params[layer]:>15,} | {trainable:>15,} | {frozen:>15,}")
 
-    logger.info("-" * 38)
-    logger.info(f"{'Total Parameters':<20} | {sum(layer_params.values()):>15,}")
+    total = sum(layer_params.values())
+    total_trainable = sum(layer_trainable.values())
+    total_frozen = total - total_trainable
+    logger.info("-" * 74)
+    logger.info(f"{'Total':<20} | {total:>15,} | {total_trainable:>15,} | {total_frozen:>15,}")
 
 
 def print_transformer_block_parameters(model: nn.Module) -> None:

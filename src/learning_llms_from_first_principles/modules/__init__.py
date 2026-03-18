@@ -10,7 +10,10 @@ from learning_llms_from_first_principles.modules.norm import LayerNorm
 from learning_llms_from_first_principles.modules.peft import (
     LinearLoRA,
     LoRALayer,
+    load_lora_adapters,
+    merge_lora_weights,
     replace_linear_with_lora,
+    save_lora_adapters,
 )
 from learning_llms_from_first_principles.modules.transformer import TransformerBlock
 
@@ -26,5 +29,8 @@ __all__ = [
     "LinearLoRA",
     "LoRALayer",
     "TransformerBlock",
+    "load_lora_adapters",
+    "merge_lora_weights",
     "replace_linear_with_lora",
+    "save_lora_adapters",
 ]
