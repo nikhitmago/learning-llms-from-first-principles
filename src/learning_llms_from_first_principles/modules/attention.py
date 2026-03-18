@@ -136,6 +136,8 @@ class MultiHeadAttentionWeightSplits(nn.Module):
     "MHA with weight splits for QKV"
 
     mask: torch.Tensor
+    cache_k: torch.Tensor | None
+    cache_v: torch.Tensor | None
 
     def __init__(self, d_emb: int, d_attn: int, context_len: int, dropout: float, num_heads: int):
         super().__init__()
@@ -156,7 +158,12 @@ class MultiHeadAttentionWeightSplits(nn.Module):
             "mask", torch.triu(torch.ones(context_len, context_len), diagonal=1).bool()
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Regsiter kv cache buffers and variables
+        self.register_buffer("cache_k", None, persistent=False)
+        self.register_buffer("cache_v", None, persistent=False)
+        self.cur_pos = 0
+
+    def forward(self, x: torch.Tensor, use_kv_cache: bool = False) -> torch.Tensor:
         bs, seq_len, d_emb = x.shape  # seq_len <= context_len
 
         # qkv: bs, seq_len, d_attn
@@ -171,14 +178,39 @@ class MultiHeadAttentionWeightSplits(nn.Module):
 
         # transpose qk to (bs, num_heads, seq_len, head_dim) for attn_scores
         queries = queries.transpose(1, 2)
-        keys = keys.transpose(1, 2)
-        values = values.transpose(1, 2)
+        keys_new = keys.transpose(1, 2)
+        values_new = values.transpose(1, 2)
+
+        # apply KV cache
+        if use_kv_cache:
+            if self.cache_k is None:
+                self.cache_k, self.cache_v = keys_new, values_new
+            else:
+                assert self.cache_k is not None and self.cache_v is not None
+                self.cache_k = torch.cat([self.cache_k, keys_new], dim=-2)  # dim=seq_len
+                self.cache_v = torch.cat([self.cache_v, values_new], dim=-2)  # dim=seq_len
+            keys, values = self.cache_k, self.cache_v
+        else:
+            keys, values = keys_new, values_new
 
         # attn_scores: bs, num_heads, seq_len, seq_len
         attn_scores = queries @ keys.transpose(2, 3)
 
-        # apply attn mask for causal attention: shape remains the same
-        attn_scores = attn_scores.masked_fill(self.mask[:seq_len, :seq_len], -torch.inf)
+        # kv cache stuff
+        num_tokens_queries = queries.shape[-2]
+        num_tokens_keys = keys.shape[-2]
+
+        # change the mask based on kv cache usage
+        if use_kv_cache:
+            attn_scores = attn_scores.masked_fill(
+                self.mask[self.cur_pos : self.cur_pos + num_tokens_queries, :num_tokens_keys],
+                -torch.inf,
+            )
+            self.cur_pos += num_tokens_queries
+        else:
+            attn_scores = attn_scores.masked_fill(
+                self.mask[:num_tokens_queries, :num_tokens_keys], -torch.inf
+            )
 
         # apply softmax to get attention weights: shape remains the same
         attn_weights = torch.softmax(attn_scores / keys.shape[-1] ** 0.5, dim=-1)
@@ -200,6 +232,10 @@ class MultiHeadAttentionWeightSplits(nn.Module):
         # project
         context_vec = self.out_proj(context_vec)
         return context_vec
+
+    def reset_kv_cache(self) -> None:
+        self.cache_k, self.cache_v = None, None
+        self.cur_pos = 0
 
 
 class MultiHeadAttentionCombinedQKV(nn.Module):

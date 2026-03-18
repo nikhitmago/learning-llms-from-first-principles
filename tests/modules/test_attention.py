@@ -151,6 +151,74 @@ def test_multihead_attention_weight_splits() -> None:
     assert not torch.isnan(output).any()
 
 
+def test_multihead_attention_weight_splits_kv_cache_correctness() -> None:
+    """Verify MHA weight-splits cached decode matches full-sequence forward."""
+    torch.manual_seed(42)
+    d_emb, d_attn, context_len, num_heads = 16, 8, 32, 2
+
+    mha = MultiHeadAttentionWeightSplits(
+        d_emb, d_attn, context_len, dropout=0.0, num_heads=num_heads
+    )
+    mha.eval()
+
+    prompt = torch.randn(1, 5, d_emb)
+    new_tokens = [torch.randn(1, 1, d_emb) for _ in range(3)]
+
+    full_seq = torch.cat([prompt] + new_tokens, dim=1)
+    with torch.no_grad():
+        expected = mha(full_seq, use_kv_cache=False)
+
+    mha.reset_kv_cache()
+    with torch.no_grad():
+        prefill_out = mha(prompt, use_kv_cache=True)
+        decode_outs = []
+        for tok in new_tokens:
+            decode_outs.append(mha(tok, use_kv_cache=True))
+
+    cached_out = torch.cat([prefill_out] + decode_outs, dim=1)
+    assert torch.allclose(expected, cached_out, atol=1e-5)
+
+
+def test_multihead_attention_weight_splits_kv_cache_is_faster() -> None:
+    """KV cache decode should be faster than recomputing the full sequence each step."""
+    torch.manual_seed(42)
+    d_emb, d_attn, context_len, num_heads = 64, 32, 256, 4
+    num_decode_steps = 50
+
+    mha = MultiHeadAttentionWeightSplits(
+        d_emb, d_attn, context_len, dropout=0.0, num_heads=num_heads
+    )
+    mha.eval()
+
+    prompt = torch.randn(1, 10, d_emb)
+
+    start = time.perf_counter()
+    with torch.no_grad():
+        seq = prompt
+        for _ in range(num_decode_steps):
+            new_tok = torch.randn(1, 1, d_emb)
+            seq = torch.cat([seq, new_tok], dim=1)
+            _ = mha(seq, use_kv_cache=False)
+    time_no_cache = time.perf_counter() - start
+
+    mha.reset_kv_cache()
+    start = time.perf_counter()
+    with torch.no_grad():
+        _ = mha(prompt, use_kv_cache=True)
+        for _ in range(num_decode_steps):
+            new_tok = torch.randn(1, 1, d_emb)
+            _ = mha(new_tok, use_kv_cache=True)
+    time_with_cache = time.perf_counter() - start
+
+    assert (
+        time_with_cache < time_no_cache
+    ), f"Cache ({time_with_cache:.4f}s) should be faster than no cache ({time_no_cache:.4f}s)"
+    speedup = time_no_cache / time_with_cache
+    print(
+        f"\nMHA KV cache: {time_with_cache:.4f}s | No cache: {time_no_cache:.4f}s | {speedup:.1f}x faster"
+    )
+
+
 def test_multihead_attention_combined_qkv() -> None:
     torch.manual_seed(123)
     d_emb, d_attn, context_len, num_heads = 12, 4, 8, 2
