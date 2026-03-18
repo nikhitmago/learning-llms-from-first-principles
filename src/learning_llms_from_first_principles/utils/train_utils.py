@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from learning_llms_from_first_principles.config import GPT_CONFIG_124M
-from learning_llms_from_first_principles.inference.generate import generate_text_simple
+from learning_llms_from_first_principles.inference.generate import generate_tokens
 from learning_llms_from_first_principles.utils.tokenization_utils import token_ids_to_text
 
 ModelT = TypeVar("ModelT", bound=nn.Module)
@@ -169,7 +169,7 @@ def train_model_v1(
                 input_ids = input_batch.to(device)
 
                 # Generate 20 new tokens
-                out_ids = generate_text_simple(
+                out_ids = generate_tokens(
                     model=model,
                     idx=input_ids,
                     max_new_tokens=20,

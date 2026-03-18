@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 
-def generate_text_simple(
+def generate_tokens(
     model: nn.Module,
     idx: torch.Tensor,
     max_new_tokens: int,
@@ -91,6 +91,40 @@ def generate_text_simple(
         idx = torch.cat((idx, idx_next), dim=1)
 
     return idx
+
+
+def generate_text(
+    text: str,
+    model: nn.Module,
+    tokenizer: Any,
+    max_new_tokens: int,
+    context_size: int,
+    temperature: float = 0.0,
+    top_k: int | None = None,
+    top_p: float | None = None,
+    device: torch.device | str = "cpu",
+) -> str:
+    """Generate text from a prompt string and return the full output as a string."""
+    from learning_llms_from_first_principles.utils.tokenization_utils import (
+        text_to_token_ids,
+        token_ids_to_text,
+    )
+
+    model.eval()
+    idx = text_to_token_ids(text, tokenizer).to(device)
+
+    with torch.no_grad():
+        out_ids = generate_tokens(
+            model=model,
+            idx=idx,
+            max_new_tokens=max_new_tokens,
+            context_size=context_size,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+        )
+
+    return token_ids_to_text(out_ids, tokenizer)
 
 
 def classify_text(

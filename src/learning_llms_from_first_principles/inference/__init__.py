@@ -1,6 +1,7 @@
 from learning_llms_from_first_principles.inference.generate import (
     classify_text,
-    generate_text_simple,
+    generate_text,
+    generate_tokens,
 )
 
-__all__ = ["classify_text", "generate_text_simple"]
+__all__ = ["classify_text", "generate_text", "generate_tokens"]
