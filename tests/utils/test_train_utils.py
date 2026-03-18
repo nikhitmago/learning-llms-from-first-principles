@@ -30,7 +30,7 @@ class DummyModel(nn.Module):
         self.embedding = nn.Embedding(vocab_size, 16)
         self.out_head = nn.Linear(16, vocab_size)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, **kwargs: Any) -> torch.Tensor:
         return self.out_head(self.embedding(x))
 
 

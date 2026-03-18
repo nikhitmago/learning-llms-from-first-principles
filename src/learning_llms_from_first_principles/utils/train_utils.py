@@ -170,7 +170,7 @@ def train_model_v1(
 
                 # Generate 20 new tokens
                 out_ids = generate_tokens(
-                    model=model,
+                    model=model,  # type: ignore[arg-type]
                     idx=input_ids,
                     max_new_tokens=20,
                     context_size=int(GPT_CONFIG_124M["context_len"]),

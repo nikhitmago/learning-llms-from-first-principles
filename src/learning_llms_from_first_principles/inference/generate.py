@@ -3,19 +3,24 @@ from typing import Any
 import torch
 import torch.nn as nn
 
+from learning_llms_from_first_principles.modules.gpt import GPTModel
+
 
 def generate_tokens(
-    model: nn.Module,
+    model: GPTModel,
     idx: torch.Tensor,
     max_new_tokens: int,
     context_size: int,
     temperature: float = 0.0,
     top_k: int | None = None,
     top_p: float | None = None,
+    use_kv_cache: bool = False,
 ) -> torch.Tensor:
     """
     Generates text sequentially by repeatedly predicting the next token.
     """
+
+    model.eval()
 
     # Intuition: Temperature is a "Volume Control" for the gap between token scores.
     # - T = 0.0 (Greedy): Deterministic. The model always picks the #1 winner.
@@ -26,14 +31,20 @@ def generate_tokens(
     #                   Results in "Word Salad" (nonsense) as T increases.
     temperature = max(0, temperature)  # negative temp doesn't make sense, treat as greedy decoding
 
+    full_sequence = idx  # track the full output for kv_cache mode
+
+    # KV cache note: the first iteration implicitly acts as PREFILL — idx is the full
+    # prompt, so the model processes all tokens and populates the cache. After that,
+    # idx = idx_next (1 token), so subsequent iterations are DECODE — the model only
+    # processes the new token while the cache provides the history.
+
     for _ in range(max_new_tokens):
-        # Crop current context if it exceeds the supported context size
-        # idx: (bs, num_tokens)
+        # KV cache: full prompt on first iter (prefill), single token after (decode)
         idx_trunc = idx[:, -context_size:]
 
         # Get the predictions
         with torch.no_grad():
-            logits = model(idx_trunc)  # (bs, num_tokens, vocab_size)
+            logits = model(idx_trunc, use_kv_cache=use_kv_cache)  # (bs, num_tokens, vocab_size)
 
         # Focus only on the last time stamp/token (next token over all vocab)
         logits = logits[:, -1, :]
@@ -87,10 +98,14 @@ def generate_tokens(
             # Deterministic Greedy: No math needed, just pick the #1 highest score
             idx_next = torch.argmax(logits, dim=-1, keepdim=True)
 
-        # Append sampled index to the running sequence
-        idx = torch.cat((idx, idx_next), dim=1)
+        if use_kv_cache:
+            full_sequence = torch.cat((full_sequence, idx_next), dim=1)
+            idx = idx_next  # KV cache decode: feed only the new token, cache has the rest
+        else:
+            # Append sampled index to the running sequence
+            idx = torch.cat((idx, idx_next), dim=1)
 
-    return idx
+    return full_sequence if use_kv_cache else idx
 
 
 def generate_text(
@@ -115,7 +130,7 @@ def generate_text(
 
     with torch.no_grad():
         out_ids = generate_tokens(
-            model=model,
+            model=model,  # type: ignore[arg-type]
             idx=idx,
             max_new_tokens=max_new_tokens,
             context_size=context_size,
