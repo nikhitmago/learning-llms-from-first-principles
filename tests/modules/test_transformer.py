@@ -26,3 +26,36 @@ def test_transformer_block_uniqueness() -> None:
     assert not torch.equal(
         block1.multi_head_attention.W_q.weight, block2.multi_head_attention.W_q.weight
     )
+
+
+def test_transformer_block_kv_cache_correctness() -> None:
+    """Verify transformer block cached decode matches full-sequence forward."""
+    torch.manual_seed(42)
+    cfg = {
+        "vocab_size": 100,
+        "context_len": 32,
+        "emb_dim": 16,
+        "n_heads": 2,
+        "n_layers": 1,
+        "drop_rate": 0.0,
+        "qkv_bias": False,
+    }
+    block = TransformerBlock(cfg)
+    block.eval()
+
+    prompt = torch.randn(1, 5, 16)
+    new_tokens = [torch.randn(1, 1, 16) for _ in range(3)]
+
+    full_seq = torch.cat([prompt] + new_tokens, dim=1)
+    with torch.no_grad():
+        expected = block(full_seq, use_kv_cache=False)
+
+    block.multi_head_attention.reset_kv_cache()
+    with torch.no_grad():
+        prefill_out = block(prompt, use_kv_cache=True)
+        decode_outs = []
+        for tok in new_tokens:
+            decode_outs.append(block(tok, use_kv_cache=True))
+
+    cached_out = torch.cat([prefill_out] + decode_outs, dim=1)
+    assert torch.allclose(expected, cached_out, atol=1e-5)

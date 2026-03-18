@@ -26,11 +26,11 @@ class TransformerBlock(nn.Module):
             cfg["drop_rate"]
         )  # dropout doesn't need 2 copies because it doesn't have learnable params
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, use_kv_cache: bool = False) -> torch.Tensor:
         # attention
         shortcut = x
         x = self.layer_norm_1(x)
-        x = self.multi_head_attention(x)
+        x = self.multi_head_attention(x, use_kv_cache=use_kv_cache)
         x = self.dropout_layer(x)
         x = x + shortcut
 
