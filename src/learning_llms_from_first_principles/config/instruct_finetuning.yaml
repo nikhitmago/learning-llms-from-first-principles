@@ -1,0 +1,19 @@
+training:
+  num_epochs: 2
+  eval_freq: 5
+  eval_iter: 5
+  lr: 5e-5
+  weight_decay: 0.1
+  batch_size: 8
+  num_workers: 0
+
+data:
+  file_path: "${pkg_root:}/artifacts/instruction-data.json"
+  train_ratio: 0.85
+  test_ratio: 0.1
+  allowed_max_length: 1024
+
+model:
+  name: "gpt2-124m"
+  pretrained_path: "${pkg_root:}/artifacts/gpt_model.pth"
+  save_model_path: "${pkg_root:}/artifacts/gpt_instruct.pth"

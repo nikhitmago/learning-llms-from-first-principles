@@ -4,7 +4,11 @@ from learning_llms_from_first_principles.utils.classify_utils import (
     calc_loss_loader_classify,
     train_classifier,
 )
-from learning_llms_from_first_principles.utils.data_utils import split_data
+from learning_llms_from_first_principles.utils.data_utils import (
+    format_instruct_prompt,
+    instruct_collate_fn,
+    split_data,
+)
 from learning_llms_from_first_principles.utils.gpu_utils import get_device
 from learning_llms_from_first_principles.utils.model_utils import (
     print_model_parameters,
@@ -27,6 +31,8 @@ from learning_llms_from_first_principles.utils.train_utils import (
 )
 
 __all__ = [
+    "format_instruct_prompt",
+    "instruct_collate_fn",
     "split_data",
     "get_device",
     "print_model_parameters",

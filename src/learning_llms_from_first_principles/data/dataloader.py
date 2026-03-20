@@ -1,9 +1,12 @@
+from functools import partial
 from typing import Any
 
 import tiktoken
 from torch.utils.data import DataLoader
 
-from .datasets import GPTDatasetV1, SpamDataset
+from learning_llms_from_first_principles.utils.data_utils import instruct_collate_fn
+
+from .datasets import GPTDatasetV1, InstructionDataset, SpamDataset
 
 
 def create_dataloader_v1(
@@ -75,3 +78,32 @@ def create_classify_dataloader(
     )
 
     return dataloader, dataset
+
+
+def create_instruct_dataloader(
+    data: list[dict[str, str]],
+    tokenizer: Any,
+    batch_size: int = 8,
+    shuffle: bool = True,
+    drop_last: bool = True,
+    num_workers: int = 0,
+    allowed_max_length: int | None = None,
+    device: str = "cpu",
+) -> DataLoader:
+    """Create a DataLoader for instruction fine-tuning."""
+    dataset = InstructionDataset(data, tokenizer)
+
+    collate_fn = partial(
+        instruct_collate_fn,
+        device=device,
+        allowed_max_length=allowed_max_length,
+    )
+
+    return DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        collate_fn=collate_fn,
+        shuffle=shuffle,
+        drop_last=drop_last,
+        num_workers=num_workers,
+    )

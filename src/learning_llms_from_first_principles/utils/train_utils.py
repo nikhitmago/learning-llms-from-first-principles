@@ -9,7 +9,10 @@ from torch.utils.data import DataLoader
 
 from learning_llms_from_first_principles.config import GPT_CONFIG_124M
 from learning_llms_from_first_principles.inference.generate import generate_tokens
-from learning_llms_from_first_principles.utils.tokenization_utils import token_ids_to_text
+from learning_llms_from_first_principles.utils.tokenization_utils import (
+    text_to_token_ids,
+    token_ids_to_text,
+)
 
 ModelT = TypeVar("ModelT", bound=nn.Module)
 
@@ -77,6 +80,7 @@ def train_model_v1(
     warmup_min_lr: float = 3e-05,
     decay_floor_lr: float = 1e-6,
     max_norm: float = 1.0,
+    instruction_fine_tuning_samples: list[str] | None = None,
 ) -> tuple[ModelT, list[float], list[float], list[float]]:
     train_losses, val_losses, lrs = [], [], []
     global_step = -1
@@ -160,42 +164,59 @@ def train_model_v1(
         logger.info("\n" + "=" * 50 + "\n")
 
         model.eval()
-        samples_printed = 0
-        with torch.no_grad():
-            for i, (input_batch, target_batch) in enumerate(val_loader):
-                if samples_printed >= 2:
-                    break
 
-                input_ids = input_batch.to(device)
-
-                # Generate 20 new tokens
-                out_ids = generate_tokens(
-                    model=model,  # type: ignore[arg-type]
-                    idx=input_ids,
-                    max_new_tokens=20,
-                    context_size=int(GPT_CONFIG_124M["context_len"]),
-                    temperature=0.0,
-                )
-
-                # Process each sample in the batch until we hit our limit of 2
-                for j in range(out_ids.shape[0]):
+        if instruction_fine_tuning_samples is not None:
+            # IFT mode: generate responses to provided instruction prompts
+            with torch.no_grad():
+                for idx_s, prompt in enumerate(instruction_fine_tuning_samples[:2]):
+                    input_ids = text_to_token_ids(prompt, tokenizer).to(device)
+                    out_ids = generate_tokens(
+                        model=model,  # type: ignore[arg-type]
+                        idx=input_ids,
+                        max_new_tokens=64,
+                        context_size=int(GPT_CONFIG_124M["context_len"]),
+                        temperature=0.0,
+                    )
+                    full_text = token_ids_to_text(out_ids, tokenizer)
+                    generated = full_text[len(prompt) :]
+                    logger.info(f"--- Epoch {epoch+1} | Sample {idx_s + 1} ---")
+                    logger.info(f"PROMPT: {prompt.strip()}")
+                    logger.info(f"RESPONSE: {generated.strip()}")
+                    logger.info("-" * 30 + "\n")
+        else:
+            # Pretraining mode: continue from val_loader samples
+            samples_printed = 0
+            with torch.no_grad():
+                for i, (input_batch, target_batch) in enumerate(val_loader):
                     if samples_printed >= 2:
                         break
 
-                    # Split input (prefill) from generated (decode) tokens
-                    # Slicing the last 20 tokens as they are the ones generated
-                    prefill_ids = out_ids[j, :-20]
-                    decode_ids = out_ids[j, -20:]
+                    input_ids = input_batch.to(device)
 
-                    prefill_text = token_ids_to_text(prefill_ids, tokenizer)
-                    decode_text = token_ids_to_text(decode_ids, tokenizer)
+                    out_ids = generate_tokens(
+                        model=model,  # type: ignore[arg-type]
+                        idx=input_ids,
+                        max_new_tokens=20,
+                        context_size=int(GPT_CONFIG_124M["context_len"]),
+                        temperature=0.0,
+                    )
 
-                    logger.info(f"--- Epoch {epoch+1} | Sample {samples_printed + 1} ---")
-                    logger.info(f"PREFILL: {prefill_text}")
-                    logger.info(f"DECODE:  {decode_text}")
-                    logger.info("-" * 30 + "\n")
+                    for j in range(out_ids.shape[0]):
+                        if samples_printed >= 2:
+                            break
 
-                    samples_printed += 1
+                        prefill_ids = out_ids[j, :-20]
+                        decode_ids = out_ids[j, -20:]
+
+                        prefill_text = token_ids_to_text(prefill_ids, tokenizer)
+                        decode_text = token_ids_to_text(decode_ids, tokenizer)
+
+                        logger.info(f"--- Epoch {epoch+1} | Sample {samples_printed + 1} ---")
+                        logger.info(f"PREFILL: {prefill_text}")
+                        logger.info(f"DECODE:  {decode_text}")
+                        logger.info("-" * 30 + "\n")
+
+                        samples_printed += 1
 
         logger.info("=" * 50 + "\n")
 

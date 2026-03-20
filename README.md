@@ -71,7 +71,7 @@ pretrain model.name=gpt2-large training.lr=0.001 training.num_epochs=10
 
 ## Classification Fine-Tuning
 
-Fine-tune a pretrained GPT model for spam/ham text classification (based on Chapter 6 of the book). This requires a pretrained model checkpoint from the pre-training step above.
+Fine-tune a pretrained GPT model for spam/ham text classification. This requires a pretrained model checkpoint from the pre-training step above.
 
 ### Usage
 
@@ -94,6 +94,26 @@ classify training.num_epochs=10 training.lr=1e-4
 LoRA (Low-Rank Adaptation) is enabled by default. Instead of updating all 124M parameters, it freezes the pretrained weights and injects small trainable adapter matrices (A and B) into every Linear layer — typically training only ~2-3% of the total parameters. After training, the adapters are saved separately and then merged back into the base weights for zero-overhead inference.
 
 When LoRA is disabled, the pipeline falls back to the standard approach: freezing all layers except the last transformer block, final layer norm, and the classification head.
+
+---
+
+## Instruction Fine-Tuning
+
+Fine-tune a pretrained GPT model to follow instructions (based on Chapter 7 of the book). Uses an Alpaca-style dataset with instruction/input/output entries.
+
+### Usage
+
+Configuration lives in [`src/.../config/instruct_finetuning.yaml`](src/learning_llms_from_first_principles/config/instruct_finetuning.yaml). The instruction dataset (1100 entries) is shipped with the package.
+
+```bash
+# Run with default settings
+instruct
+
+# Override training parameters
+instruct training.num_epochs=3 training.lr=1e-4
+```
+
+The pipeline loads pretrained weights, splits the data into train/val/test (85/5/10), and uses the same training loop as pre-training. The `instruct_collate_fn` in `utils/data_utils.py` handles batch padding and target masking.
 
 ---
 

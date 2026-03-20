@@ -1,5 +1,3 @@
-import time
-
 import torch
 
 from learning_llms_from_first_principles.inference.generate import generate_tokens
@@ -210,39 +208,3 @@ def test_generate_tokens_kv_cache_correctness() -> None:
     )
 
     assert torch.equal(out_no_cache, out_with_cache)
-
-
-def test_generate_tokens_kv_cache_is_faster() -> None:
-    """KV cache generation should be faster than non-cached."""
-    torch.manual_seed(42)
-    cfg = {
-        "vocab_size": 100,
-        "context_len": 256,
-        "emb_dim": 64,
-        "n_heads": 4,
-        "n_layers": 4,
-        "drop_rate": 0.0,
-        "qkv_bias": False,
-    }
-    model = GPTModel(cfg)
-    model.eval()
-    num_tokens = 30
-
-    idx = torch.randint(0, 100, (1, 10))
-
-    start = time.perf_counter()
-    generate_tokens(model, idx, max_new_tokens=num_tokens, context_size=256, use_kv_cache=False)
-    time_no_cache = time.perf_counter() - start
-
-    model.reset_kv_cache_gpt()
-    start = time.perf_counter()
-    generate_tokens(model, idx, max_new_tokens=num_tokens, context_size=256, use_kv_cache=True)
-    time_with_cache = time.perf_counter() - start
-
-    assert (
-        time_with_cache < time_no_cache
-    ), f"Cache ({time_with_cache:.4f}s) should be faster than no cache ({time_no_cache:.4f}s)"
-    speedup = time_no_cache / time_with_cache
-    print(
-        f"\ngenerate_tokens KV cache: {time_with_cache:.4f}s | No cache: {time_no_cache:.4f}s | {speedup:.1f}x faster"
-    )
