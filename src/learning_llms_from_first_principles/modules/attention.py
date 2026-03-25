@@ -299,3 +299,146 @@ class MultiHeadAttentionCombinedQKV(nn.Module):
 
         context_vec = self.out_proj(context_vec)
         return context_vec
+
+
+def flash_attention_v1(
+    Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, block_size: int = 2
+) -> torch.Tensor:
+    """
+    Compute attention output using Flash Attention v1 algorithm.
+
+    Args:
+        Q: Query matrix (seq_len, head_dim)
+        K: Key matrix (seq_len, head_dim)
+        V: Value matrix (seq_len, head_dim)
+        block_size: Size of blocks for tiled computation
+
+    Returns:
+        Output matrix (seq_len, head_dim)
+
+    Visual example — 'The cat sat on the mat' (seq_len=6, block_size=2, num_blocks=3):
+
+    The full attention matrix is never materialized. Instead, we process one block at a time:
+
+                  K0       K1       K2
+               |The cat |sat on  |the mat |
+         ------+--------+--------+--------+
+    Q0   The   |  .  .  |  .  .  |  .  .  |
+         cat   |  .  .  |  .  .  |  .  .  |
+         ------+--------+--------+--------+
+    Q1   sat   |  .  .  |  .  .  |  .  .  |
+         on    |  .  .  |  .  .  |  .  .  |
+         ------+--------+--------+--------+
+    Q2   the   |  .  .  |  .  .  |  .  .  |
+         mat   |  .  .  |  .  .  |  .  .  |
+         ------+--------+--------+--------+
+
+    Processing order (9 steps, one 2x2 block at a time):
+      Step 1: i=0,j=0 → 'The,cat' attend to 'The,cat'
+      Step 2: i=0,j=1 → 'The,cat' attend to 'sat,on'
+      Step 3: i=0,j=2 → 'The,cat' attend to 'the,mat'  → rows 0,1 done, normalize
+      Step 4: i=1,j=0 → 'sat,on'  attend to 'The,cat'
+      Step 5: i=1,j=1 → 'sat,on'  attend to 'sat,on'
+      Step 6: i=1,j=2 → 'sat,on'  attend to 'the,mat'  → rows 2,3 done, normalize
+      Step 7: i=2,j=0 → 'the,mat' attend to 'The,cat'
+      Step 8: i=2,j=1 → 'the,mat' attend to 'sat,on'
+      Step 9: i=2,j=2 → 'the,mat' attend to 'the,mat'  → rows 4,5 done, normalize
+
+    HW note: In a real GPU implementation, each block's operations (score computation,
+    softmax update, V accumulation) are fused and happen entirely in SRAM. Q/K/V blocks
+    are loaded from HBM to SRAM once per block, and only the final O is written back.
+    The full attention matrix never touches HBM — that's the core memory saving.
+    This Python version is a functional reference; the actual speedup comes from that
+    HBM ↔ SRAM transfer avoidance on hardware.
+    """
+    seq_len, head_dim = Q.shape
+    num_blocks = (seq_len + block_size - 1) // block_size  # trick to handle odd-sized seq_lens
+
+    m = torch.full((seq_len,), -torch.inf)  # needed to track global max per query-row
+    l = torch.zeros(seq_len)  # needed to track global sum per query-row  # noqa: E741
+    O = torch.zeros((seq_len, head_dim))  # final output  # noqa: E741
+
+    for i in range(num_blocks):
+
+        ## chunk queries into blocks
+        q_start = i * block_size
+        q_end = min(
+            (i + 1) * block_size, seq_len
+        )  # min() clamps for last block if seq_len % block_size != 0
+        Q_block = Q[
+            q_start:q_end, :
+        ]  # (actual_block_size, head_dim) — may be < block_size on last block
+
+        for j in range(num_blocks):
+
+            ## Chunk keys into blocks
+            k_start = j * block_size
+            k_end = min((j + 1) * block_size, seq_len)  # same clamp for keys
+            K_block = K[k_start:k_end, :]  # (actual_block_size, head_dim)
+
+            ## block-wise attention scores
+            attn_scores_ij = (Q_block @ K_block.T) * (1 / (head_dim**0.5))  # (q_block, k_block)
+
+            ## Calculate old stats (shape: (q_block_size, ))
+            m_old = m[q_start:q_end].clone()  # .clone() is critical — without it m_old is a view,
+            l_old = l[
+                q_start:q_end
+            ].clone()  # and updating m/l later would silently corrupt m_old/l_old
+
+            ## Calculate new stats (shape: (q_block_size, ))
+
+            ### new max
+            m_new = torch.maximum(
+                torch.max(
+                    attn_scores_ij, dim=1
+                ).values,  # maximum of attn_scores_ij for each query in a block
+                m_old,
+            )  # uber-level element wise maxium along with m_old
+
+            ### new sum using softmax trick
+            # let, softmax_new = exp(x_cur - m_new) / exp(x_all - m_new).sum()
+            # we know, l_old = exp(x_all - m_old).sum()
+            # lets add 2 new terms to this equation because we dont want to load x_all when processing a block
+            # => attn_weights_ij = exp(attn_scores_ij - m_new) / exp(attn_scores_ij - m_new + m_old - m_old).sum() # add 2 new terms
+            # => attn_weights_ij = exp(attn_scores_ij - m_new) / exp(attn_scores_ij - m_old + m_old - m_new).sum() # re-arrange
+            # => attn_weights_ij = exp(attn_scores_ij - m_new) / (exp(attn_scores_ij - m_old) * exp(m_old - m_new)).sum() # multiply the exps
+            # => attn_weights_ij = exp(attn_scores_ij - m_new) / exp(m_old - m_new) * exp(attn_scores_ij - m_old).sum() # take out constant from the sum
+            # => attn_weights_ij = exp(attn_scores_ij - m_new) / exp(m_old - m_new) * l_old # substitute
+            # => l_new = exp(m_old - m_new) * l_old  # extract the denominator
+            # => l_new = exp(m_old - m_new) * l_old + exp(attn_scores_ij - m_new).sum(dim=1)  # l_old doesn't factor in the current block, so we must add the numerator sum
+
+            # [:, None] reshapes (q_block,) -> (q_block, 1) so each row gets its own max subtracted.
+            # Without it, broadcasting treats (q_block,) as (1, q_block) = column-wise subtraction = WRONG.
+            exp_numerator = torch.exp(attn_scores_ij - m_new[:, None])
+            l_new = torch.exp(m_old - m_new) * l_old + exp_numerator.sum(dim=1)
+
+            # Normally you'd compute attn_weights = exp_numerator / l_new, but we skip it
+            # we multiply exp_numerator @ V directly and defer the /l to the final normalization.
+
+            ## Chunk the V block
+            V_block = V[k_start:k_end, :]
+
+            ## Update output with correction
+            # WHY correction: Old O was accumulated using exp(scores - m_old). Now m changed to m_new,
+            # so old values are on the wrong scale. We fix without recomputing:
+            #   exp(score - m_new) = exp(score - m_old) * exp(m_old - m_new)
+            #                        ─────────────────    ─────────────────
+            #                        baked into old O     correction factor
+            # If max didn't change: exp(0) = 1 → no-op. If max went up: < 1 → shrinks old values.
+            # Current block's exp_numerator is already computed with m_new, so no correction needed for it.
+            O_block = exp_numerator @ V_block
+            correction = torch.exp(m_old - m_new)
+            O[q_start:q_end, :] = O[q_start:q_end, :] * correction[:, None] + O_block
+
+            ## Write back updated stats
+            m[q_start:q_end] = m_new
+            l[q_start:q_end] = l_new
+
+        ## Normalize: divide ONCE after inner loop, not per-block.
+        # WHY: O accumulates unnormalized weighted sums (sum of exp(s)*V) during the j loop.
+        # l keeps changing as new blocks may reveal bigger maxes (triggering corrections).
+        # Only after the inner loop finishes has this Q block seen ALL keys, so l is final.
+        # Dividing earlier would be wrong because l isn't complete yet.
+        O[q_start:q_end, :] /= l[q_start:q_end, None]
+
+    return O
