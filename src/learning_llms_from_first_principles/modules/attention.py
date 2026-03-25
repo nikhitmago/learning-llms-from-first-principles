@@ -442,3 +442,52 @@ def flash_attention_v1(
         O[q_start:q_end, :] /= l[q_start:q_end, None]
 
     return O
+
+
+def grouped_query_attention(
+    Q: torch.Tensor,
+    K: torch.Tensor,
+    V: torch.Tensor,
+    num_heads: int,
+    num_kv_heads: int,
+) -> torch.Tensor:
+    """
+    Compute Grouped Query Attention (GQA).
+
+    In standard MHA, num_kv_heads == num_heads (every query head has its own KV head).
+    In MQA, num_kv_heads == 1 (all query heads share a single KV head).
+    GQA is the middle ground: groups of query heads share a KV head.
+
+    Args:
+        Q: Query tensor, shape (batch_size, seq_len, num_heads * head_dim)
+        K: Key tensor, shape (batch_size, seq_len, num_kv_heads * head_dim)
+        V: Value tensor, shape (batch_size, seq_len, num_kv_heads * head_dim)
+        num_heads: Number of query heads
+        num_kv_heads: Number of key/value heads
+
+    Returns:
+        Output tensor, shape (batch_size, seq_len, num_heads * head_dim)
+    """
+    batch_size, seq_len, q_dim = Q.shape
+    head_dim = q_dim // num_heads
+    num_groups = num_heads // num_kv_heads
+
+    # Reshape to separate heads: (batch, seq, heads, head_dim)
+    # Then transpose to: (batch, heads, seq, head_dim)
+    Q = Q.reshape(batch_size, seq_len, num_heads, head_dim).permute(0, 2, 1, 3)
+    K = K.reshape(batch_size, seq_len, num_kv_heads, head_dim).permute(0, 2, 1, 3)
+    V = V.reshape(batch_size, seq_len, num_kv_heads, head_dim).permute(0, 2, 1, 3)
+
+    # Expand K, V by repeating each kv head for its group of query heads
+    K = K.repeat_interleave(num_groups, dim=1)
+    V = V.repeat_interleave(num_groups, dim=1)
+
+    # Scaled dot-product attention
+    scores = (Q @ K.transpose(-2, -1)) / (head_dim**0.5)
+    attn_weights = torch.softmax(scores, dim=-1)
+    output = attn_weights @ V
+
+    # Reshape back: (batch, heads, seq, head_dim) -> (batch, seq, heads * head_dim)
+    output = output.permute(0, 2, 1, 3).reshape(batch_size, seq_len, num_heads * head_dim)
+
+    return output
