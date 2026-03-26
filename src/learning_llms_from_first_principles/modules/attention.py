@@ -491,3 +491,66 @@ def grouped_query_attention(
     output = output.permute(0, 2, 1, 3).reshape(batch_size, seq_len, num_heads * head_dim)
 
     return output
+
+
+def gated_attention(
+    X: torch.Tensor,
+    W_q: torch.Tensor,
+    W_k: torch.Tensor,
+    W_v: torch.Tensor,
+    W_g: torch.Tensor,
+    apply_mask: bool = True,
+) -> torch.Tensor:
+    """
+    Compute Gated Attention output.
+
+    Gated Attention adds a learned, per-token, per-dimension gate on top of standard
+    scaled dot-product attention. The gate is a sigmoid-activated linear projection of
+    the input, producing values in [0, 1] that element-wise multiply the attention output.
+    This gives the model fine-grained control over which dimensions of the attention
+    output to keep or suppress — like a soft switch per feature.
+
+    Standard attention:  output = softmax(QK^T / sqrt(d_k)) @ V
+    Gated attention:     output = sigmoid(X @ W_g) * softmax(QK^T / sqrt(d_k)) @ V
+
+
+    Args:
+        X: Input tensor of shape (seq_len, d_model)
+        W_q: Query projection of shape (d_model, d_k)
+        W_k: Key projection of shape (d_model, d_k)
+        W_v: Value projection of shape (d_model, d_v)
+        W_g: Gate projection of shape (d_model, d_v)
+
+    Returns:
+        Gated attention output of shape (seq_len, d_v)
+    """
+    seq_len = X.shape[0]
+    _, d_k = W_k.shape
+
+    # qkv projections: (seq_len, d_q/k/v)
+    Q = X @ W_q
+    K = X @ W_k
+    V = X @ W_v
+
+    # attention scores: (seq_len, seq_len)
+    attn_scores = (Q @ K.T) / (d_k**0.5)
+
+    # apply optional causal mask
+    if apply_mask:
+        mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
+        attn_scores.masked_fill_(mask, -torch.inf)
+
+    # apply softmax
+    attn_weights = torch.softmax(attn_scores, dim=-1)
+
+    # context vec
+    context_vec = attn_weights @ V
+
+    # Sigmoid gate: unlike softmax which makes elements compete (sum to 1),
+    # sigmoid treats each dimension independently — each value maps to [0, 1]
+    # on its own. Multiple dims can be high or low simultaneously.
+    # This is what we want for gating: independent per-dimension control.
+    gate = torch.sigmoid(X @ W_g)
+    gated_context_vec = context_vec * gate
+
+    return gated_context_vec
