@@ -19,6 +19,12 @@ def attention_memory_flops(
             'total_flops': int - Total FLOPs
             'memory_bytes': int - Total memory traffic in bytes
             'arithmetic_intensity': float - FLOPs per byte, rounded to 2 decimal places
+
+    Note on FLOP counting:
+        For a matmul (M, K) @ (K, N), we count 2*K*M*N FLOPs. The 2K comes from
+        the dot product of two length-K vectors: K multiplications + (K-1) additions
+        = 2K-1 ops per output element, approximated as 2K for large K. There are
+        M*N such dot products (one per output element), giving 2*K*M*N total.
     """
     # FLOPs
     qk_flops = 2 * B * h * d * N * N  # (B, h, N, d) x (B, h, d, N)
